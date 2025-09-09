@@ -1,6 +1,6 @@
 {
-    "title": "Mount Elizabeth Medical Centre Crawler",
-    "description": "⚠️ ALL FIELDS ARE REQUIRED - Crawls specialist information from Mount Elizabeth Medical Centre website. Please fill out all required fields below.",
+    "title": "Web Scraper & Crawler",
+    "description": "Flexible web scraper that can crawl websites for specialist data or scrape specific URLs with custom selectors. Switch between crawling mode and scraper-only mode.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
@@ -198,6 +198,55 @@
             "description": "Custom user agent string to use for requests - Optional field",
             "editor": "textfield",
             "prefill": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
+        "manualMode": {
+            "title": "Manual Mode",
+            "type": "boolean",
+            "description": "Enable manual intervention for handling challenges/captchas - Useful for sites with bot protection",
+            "editor": "checkbox",
+            "default": false
+        },
+        "scraperMode": {
+            "title": "🎯 Scraper-Only Mode",
+            "type": "boolean",
+            "description": "Enable scraper-only mode to scrape specific URLs instead of crawling. When enabled, provide URLs in 'URLs to Scrape' field below.",
+            "editor": "checkbox",
+            "default": false
+        },
+        "scraperUrls": {
+            "title": "URLs to Scrape (Required for Scraper-Only Mode)",
+            "type": "array",
+            "description": "List of specific URLs to scrape when Scraper-Only Mode is enabled. Add one URL per line.",
+            "editor": "stringList",
+            "items": {
+                "type": "string",
+                "pattern": "^https?://"
+            },
+            "example": [
+                "https://example.com/doctor/john-smith",
+                "https://example.com/doctor/jane-doe"
+            ]
+        },
+        "customSelectors": {
+            "title": "Custom Selectors (For Scraper-Only Mode)",
+            "type": "object",
+            "description": "Custom CSS selectors for data extraction in scraper-only mode. Define selectors for the data you want to extract.",
+            "editor": "json",
+            "prefill": {
+                "doctorName": ".doctor-name, .name, h3, h4, .title",
+                "position": ".specialty, .position, .department, p, .description",
+                "phoneLinks": ".tel_number a, a[href^=\"tel:\"], .phone a, .contact a",
+                "doctorCards": ".doctor-card, .doctor-item, .profile-card, .specialist-card, .card",
+                "emailLinks": "a[href^=\"mailto:\"], .email a",
+                "education": ".education, .qualifications, .credentials",
+                "clinicAddress": ".address, .location, .clinic-address"
+            },
+            "example": {
+                "doctorName": ".doctor-name, h3",
+                "specialty": ".specialty, .position",
+                "phoneNumber": "a[href^='tel:']",
+                "email": "a[href^='mailto:']"
+            }
         }
     },
     "required": [
