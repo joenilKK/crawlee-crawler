@@ -2,21 +2,20 @@
  * Data extraction utilities for specialist information
  */
 
-import { CONFIG } from '../config/config.js';
-
 /**
  * Extract doctor name from specialist page
  * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
  * @returns {Promise<string>} Doctor name
  */
-export async function extractDoctorName(page) {
+export async function extractDoctorName(page, config) {
     try {
-        await page.waitForSelector(CONFIG.SELECTORS.doctorName, { timeout: CONFIG.CRAWLER.timeout });
+        await page.waitForSelector(config.SELECTORS.doctorName, { timeout: config.CRAWLER.timeout });
         
         const doctorName = await page.evaluate((selector) => {
             const nameElement = document.querySelector(selector);
             return nameElement ? nameElement.textContent.trim() : 'Name not found';
-        }, CONFIG.SELECTORS.doctorName);
+        }, config.SELECTORS.doctorName);
         
         return doctorName;
     } catch (error) {
@@ -28,9 +27,10 @@ export async function extractDoctorName(page) {
 /**
  * Extract contact details from specialist page
  * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
  * @returns {Promise<Array>} Array of contact details
  */
-export async function extractContactDetails(page) {
+export async function extractContactDetails(page, config) {
     try {
         const contactDetails = await page.evaluate((selector) => {
             const contactElements = document.querySelectorAll(selector);
@@ -48,7 +48,7 @@ export async function extractContactDetails(page) {
             });
             
             return contacts;
-        }, CONFIG.SELECTORS.contactLinks);
+        }, config.SELECTORS.contactLinks);
         
         return contactDetails;
     } catch (error) {
@@ -61,14 +61,15 @@ export async function extractContactDetails(page) {
  * Extract all specialist data from a detail page
  * @param {Page} page - Playwright page object
  * @param {string} url - Current page URL
+ * @param {Object} config - Configuration object
  * @returns {Promise<Object>} Specialist data object
  */
-export async function extractSpecialistData(page, url) {
+export async function extractSpecialistData(page, url, config) {
     console.log(`Extracting data from specialist page: ${url}`);
     
     try {
-        const doctorName = await extractDoctorName(page);
-        const contactDetails = await extractContactDetails(page);
+        const doctorName = await extractDoctorName(page, config);
+        const contactDetails = await extractContactDetails(page, config);
         
         const specialistData = {
             url: url,

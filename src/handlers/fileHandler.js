@@ -4,27 +4,27 @@
 
 import fs from 'fs';
 import path from 'path';
-import { CONFIG } from '../config/config.js';
 
 /**
  * Save extracted data to JSON file
  * @param {Array} extractedData - Array of specialist data
+ * @param {Object} config - Configuration object
  * @returns {Promise<string>} File path where data was saved
  */
-export async function saveDataToFile(extractedData) {
-    const filename = CONFIG.OUTPUT.getFilename();
+export async function saveDataToFile(extractedData, config) {
+    const filename = config.OUTPUT.getFilename();
     const filepath = path.join(process.cwd(), filename);
     
     console.log(`\nCrawling completed! Saving ${extractedData.length} records to ${filename}`);
     
     const jsonData = {
-        siteName: CONFIG.SITE.name,
+        siteName: config.SITE.name,
         extractedDate: new Date().toISOString().split('T')[0],
         totalRecords: extractedData.length,
         specialists: extractedData,
         metadata: {
             crawledAt: new Date().toISOString(),
-            sourceUrl: CONFIG.SITE.startUrl
+            sourceUrl: config.SITE.startUrl
         }
     };
     
@@ -41,8 +41,9 @@ export async function saveDataToFile(extractedData) {
 /**
  * Create backup of existing file if it exists
  * @param {string} filename - Name of the file to backup
+ * @param {Object} config - Configuration object (optional)
  */
-export function createBackupIfExists(filename) {
+export function createBackupIfExists(filename, config) {
     const filepath = path.join(process.cwd(), filename);
     
     if (fs.existsSync(filepath)) {

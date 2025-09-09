@@ -1,0 +1,21 @@
+{
+    "actorSpecification": 1,
+    "name": "mount-elizabeth-crawler",
+    "title": "Mount Elizabeth Medical Centre Crawler",
+    "description": "Crawls specialist information from Mount Elizabeth Medical Centre website with configurable pagination and selectors",
+    "version": "0.0.1",
+    "meta": {
+        "templateId": "node-crawlee-playwright"
+    },
+    "input": "./INPUT_SCHEMA.json",
+    "dockerfile": "./Dockerfile",
+    "readme": "./README.md",
+    "categories": [
+        "SCRAPING"
+    ],
+    "defaultRunOptions": {
+        "build": "latest",
+        "timeoutSecs": 3600,
+        "memoryMbytes": 4096
+    }
+}

@@ -2,17 +2,17 @@
  * Pagination handling utilities
  */
 
-import { CONFIG } from '../config/config.js';
 import { shouldCrawlUrl } from '../utils/helpers.js';
 
 /**
  * Check if next button exists and is not disabled
  * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
  * @returns {Promise<boolean>} True if next page is available
  */
-export async function hasNextPage(page) {
+export async function hasNextPage(page, config) {
     try {
-        const nextButton = await page.$(CONFIG.SELECTORS.nextButton);
+        const nextButton = await page.$(config.SELECTORS.nextButton);
         if (!nextButton) {
             console.log('No next button found on this page');
             return false;
@@ -23,7 +23,7 @@ export async function hasNextPage(page) {
         const isDisabled = await page.evaluate((selector) => {
             const nextBtn = document.querySelector(selector);
             return nextBtn ? nextBtn.classList.contains('disabled') : true;
-        }, CONFIG.SELECTORS.nextButtonContainer);
+        }, config.SELECTORS.nextButtonContainer);
         
         console.log(`Next button disabled status: ${isDisabled}`);
         
@@ -37,11 +37,12 @@ export async function hasNextPage(page) {
 /**
  * Extract current page number from URL based on pagination configuration
  * @param {string} currentUrl - Current page URL
+ * @param {Object} config - Configuration object
  * @returns {number} Current page number
  */
-export function getCurrentPageNumber(currentUrl) {
+export function getCurrentPageNumber(currentUrl, config) {
     try {
-        const paginationConfig = CONFIG.SITE.pagination;
+        const paginationConfig = config.SITE.pagination;
         
         if (paginationConfig.type === 'query') {
             // Extract page from query parameters
@@ -59,23 +60,24 @@ export function getCurrentPageNumber(currentUrl) {
         return paginationConfig.startPage;
     } catch (error) {
         console.error('Error extracting current page number:', error);
-        return CONFIG.SITE.pagination.startPage;
+        return config.SITE.pagination.startPage;
     }
 }
 
 /**
  * Generate next page URL based on current page using flexible pagination configuration
  * @param {string} currentUrl - Current page URL
+ * @param {Object} config - Configuration object
  * @returns {string} Next page URL
  */
-export function getNextPageUrl(currentUrl) {
+export function getNextPageUrl(currentUrl, config) {
     try {
-        const paginationConfig = CONFIG.SITE.pagination;
-        const currentPage = getCurrentPageNumber(currentUrl);
+        const paginationConfig = config.SITE.pagination;
+        const currentPage = getCurrentPageNumber(currentUrl, config);
         const nextPage = currentPage + 1;
         
         let nextPageUrl;
-        const baseUrl = paginationConfig.baseUrl || CONFIG.SITE.startUrl;
+        const baseUrl = paginationConfig.baseUrl || config.SITE.startUrl;
         
         if (paginationConfig.type === 'query') {
             // Generate query-based pagination URL
@@ -108,20 +110,21 @@ export function getNextPageUrl(currentUrl) {
  * @param {Page} page - Playwright page object
  * @param {string} currentUrl - Current page URL
  * @param {Function} enqueueLinks - Crawlee enqueueLinks function
+ * @param {Object} config - Configuration object
  * @returns {Promise<boolean>} True if next page was enqueued
  */
-export async function handlePagination(page, currentUrl, enqueueLinks) {
-    const hasNext = await hasNextPage(page);
+export async function handlePagination(page, currentUrl, enqueueLinks, config) {
+    const hasNext = await hasNextPage(page, config);
     
     if (hasNext) {
-        const nextPageUrl = getNextPageUrl(currentUrl);
+        const nextPageUrl = getNextPageUrl(currentUrl, config);
         
-        if (nextPageUrl && shouldCrawlUrl(nextPageUrl, CONFIG.SITE)) {
+        if (nextPageUrl && shouldCrawlUrl(nextPageUrl, config.SITE)) {
             console.log(`Enqueuing next page: ${nextPageUrl}`);
             
             await enqueueLinks({
                 urls: [nextPageUrl],
-                label: CONFIG.CRAWLER.labels.SPECIALISTS_LIST,
+                label: config.CRAWLER.labels.SPECIALISTS_LIST,
             });
             
             return true;
@@ -138,12 +141,13 @@ export async function handlePagination(page, currentUrl, enqueueLinks) {
 /**
  * Generate page URL for a specific page number using flexible pagination configuration
  * @param {number} pageNumber - Page number to generate URL for
+ * @param {Object} config - Configuration object
  * @returns {string} Page URL
  */
-export function getPageUrl(pageNumber) {
+export function getPageUrl(pageNumber, config) {
     try {
-        const paginationConfig = CONFIG.SITE.pagination;
-        const baseUrl = paginationConfig.baseUrl || CONFIG.SITE.startUrl;
+        const paginationConfig = config.SITE.pagination;
+        const baseUrl = paginationConfig.baseUrl || config.SITE.startUrl;
         
         if (paginationConfig.type === 'query') {
             // Generate query-based pagination URL
@@ -172,21 +176,22 @@ export function getPageUrl(pageNumber) {
  * Handle initial page pagination (page 1 to page 2)
  * @param {Page} page - Playwright page object
  * @param {Function} enqueueLinks - Crawlee enqueueLinks function
+ * @param {Object} config - Configuration object
  * @returns {Promise<boolean>} True if page 2 was enqueued
  */
-export async function handleInitialPagination(page, enqueueLinks) {
-    const hasNext = await hasNextPage(page);
+export async function handleInitialPagination(page, enqueueLinks, config) {
+    const hasNext = await hasNextPage(page, config);
     
     if (hasNext) {
-        const nextPageNumber = CONFIG.SITE.pagination.startPage + 1;
-        const nextPageUrl = getPageUrl(nextPageNumber);
+        const nextPageNumber = config.SITE.pagination.startPage + 1;
+        const nextPageUrl = getPageUrl(nextPageNumber, config);
         
-        if (nextPageUrl && shouldCrawlUrl(nextPageUrl, CONFIG.SITE)) {
+        if (nextPageUrl && shouldCrawlUrl(nextPageUrl, config.SITE)) {
             console.log(`Enqueuing page ${nextPageNumber}: ${nextPageUrl}`);
             
             await enqueueLinks({
                 urls: [nextPageUrl],
-                label: CONFIG.CRAWLER.labels.SPECIALISTS_LIST,
+                label: config.CRAWLER.labels.SPECIALISTS_LIST,
             });
             
             return true;

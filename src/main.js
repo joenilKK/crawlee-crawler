@@ -1,15 +1,114 @@
+import { Actor } from 'apify';
 import { PlaywrightCrawler } from 'crawlee';
-import { CONFIG } from './config/config.js';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { handlePagination, handleInitialPagination } from './handlers/paginationHandler.js';
 import { shouldCrawlUrl } from './utils/helpers.js';
 
+// Initialize Apify Actor
+await Actor.init();
+
+// Get input from Apify Actor
+const input = await Actor.getInput();
+
+// Validate required input fields
+const requiredFields = {
+    'siteName': 'Site Name',
+    'baseUrl': 'Base URL',
+    'startUrl': 'Start URL',
+    'allowedUrlPatterns': 'Allowed URL Patterns',
+    'paginationType': 'Pagination Type',
+    'specialistLinksSelector': 'Specialist Links Selector',
+    'nextButtonSelector': 'Next Button Selector',
+    'nextButtonContainerSelector': 'Next Button Container Selector',
+    'doctorNameSelector': 'Doctor Name Selector',
+    'contactLinksSelector': 'Contact Links Selector',
+    'maxRequestsPerCrawl': 'Max Requests Per Crawl',
+    'headless': 'Headless Mode',
+    'timeout': 'Timeout'
+};
+
+const missingFields = [];
+for (const [fieldKey, fieldName] of Object.entries(requiredFields)) {
+    if (input[fieldKey] === undefined || input[fieldKey] === null || input[fieldKey] === '') {
+        missingFields.push(fieldName);
+    }
+}
+
+// Special validation for arrays
+if (input.allowedUrlPatterns && input.allowedUrlPatterns.length === 0) {
+    missingFields.push('Allowed URL Patterns (must contain at least one pattern)');
+}
+
+// Conditional required fields based on pagination type
+if (input.paginationType === 'query' && (!input.queryPattern || input.queryPattern.trim() === '')) {
+    missingFields.push('Query Pattern (required when Pagination Type is "query")');
+}
+if (input.paginationType === 'path' && (!input.pathPattern || input.pathPattern.trim() === '')) {
+    missingFields.push('Path Pattern (required when Pagination Type is "path")');
+}
+
+if (missingFields.length > 0) {
+    const errorMessage = `❌ CONFIGURATION ERROR: The following required fields are missing or empty:\n\n${missingFields.map(field => `• ${field}`).join('\n')}\n\n⚠️  All fields marked as required in the input schema must be filled out. Please provide values for all missing fields and try again.`;
+    console.error(errorMessage);
+    throw new Error(errorMessage);
+}
+
+// Create configuration object from input (no fallbacks)
+const CONFIG = {
+    SITE: {
+        name: input.siteName,
+        baseUrl: input.baseUrl,
+        startUrl: input.startUrl,
+        allowedUrlPatterns: input.allowedUrlPatterns,
+        excludedUrlPatterns: input.excludedUrlPatterns || [],
+        pagination: {
+            type: input.paginationType,
+            queryPattern: input.queryPattern || 'page={page}',
+            pathPattern: input.pathPattern || '/page/{page}/',
+            baseUrl: input.paginationBaseUrl || null,
+            startPage: input.startPage || 1
+        }
+    },
+    SELECTORS: {
+        specialistLinks: input.specialistLinksSelector,
+        nextButton: input.nextButtonSelector,
+        nextButtonContainer: input.nextButtonContainerSelector,
+        doctorName: input.doctorNameSelector,
+        contactLinks: input.contactLinksSelector
+    },
+    CRAWLER: {
+        maxRequestsPerCrawl: input.maxRequestsPerCrawl,
+        headless: input.headless,
+        timeout: input.timeout,
+        labels: {
+            DETAIL: 'DETAIL',
+            SPECIALISTS_LIST: 'SPECIALISTS_LIST'
+        }
+    },
+    OUTPUT: {
+        getFilename: () => {
+            if (input.outputFilename && input.outputFilename.trim() !== '') {
+                return input.outputFilename.endsWith('.json') ? input.outputFilename : `${input.outputFilename}.json`;
+            }
+            const today = new Date().toISOString().split('T')[0];
+            return `memc-specialists-${today}.json`;
+        }
+    }
+};
+
+console.log('Starting crawler with configuration:', {
+    siteName: CONFIG.SITE.name,
+    startUrl: CONFIG.SITE.startUrl,
+    maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl,
+    headless: CONFIG.CRAWLER.headless
+});
+
 // Array to store all extracted data
 let extractedData = [];
 
 // Create backup of existing file if needed
-createBackupIfExists(CONFIG.OUTPUT.getFilename());
+createBackupIfExists(CONFIG.OUTPUT.getFilename(), CONFIG);
 
 const crawler = new PlaywrightCrawler({
     requestHandler: async ({ page, request, enqueueLinks }) => {
@@ -23,7 +122,7 @@ const crawler = new PlaywrightCrawler({
         
         if (request.label === CONFIG.CRAWLER.labels.DETAIL) {
             // Extract specialist data from detail page
-            const specialistData = await extractSpecialistData(page, request.url);
+            const specialistData = await extractSpecialistData(page, request.url, CONFIG);
             extractedData.push(specialistData);
             
         } else if (request.label === CONFIG.CRAWLER.labels.SPECIALISTS_LIST) {
@@ -48,7 +147,7 @@ const crawler = new PlaywrightCrawler({
             });
             
             // Handle pagination to next page
-            await handlePagination(page, request.url, enqueueLinks);
+            await handlePagination(page, request.url, enqueueLinks, CONFIG);
             
         } else {
             // This is the initial page load
@@ -103,7 +202,7 @@ const crawler = new PlaywrightCrawler({
             });
             
             // Handle pagination for the first page
-            await handleInitialPagination(page, enqueueLinks);
+            await handleInitialPagination(page, enqueueLinks, CONFIG);
         }
     },
     maxRequestsPerCrawl: CONFIG.CRAWLER.maxRequestsPerCrawl,
@@ -113,4 +212,23 @@ const crawler = new PlaywrightCrawler({
 await crawler.run([CONFIG.SITE.startUrl]);
 
 // Save extracted data to JSON file
-await saveDataToFile(extractedData);
+const outputPath = await saveDataToFile(extractedData, CONFIG);
+
+// Store the results in Apify dataset
+await Actor.pushData({
+    summary: {
+        totalRecords: extractedData.length,
+        siteName: CONFIG.SITE.name,
+        startUrl: CONFIG.SITE.startUrl,
+        extractedAt: new Date().toISOString(),
+        outputFile: CONFIG.OUTPUT.getFilename()
+    },
+    specialists: extractedData
+});
+
+console.log(`✅ Crawling completed! Found ${extractedData.length} specialists.`);
+console.log(`📁 Data saved to: ${outputPath}`);
+console.log(`📊 Data also stored in Apify dataset`);
+
+// Exit the Actor
+await Actor.exit();
