@@ -83,7 +83,7 @@ storage/
 
 # Output files
 *.json
-!INPUT_SCHEMA.json
+!.actor/INPUT_SCHEMA.json
 !.actor/actor.json
 !package.json
 !package-lock.json
