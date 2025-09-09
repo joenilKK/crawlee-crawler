@@ -1,20 +1,23 @@
-# Mount Elizabeth Medical Centre Crawler
+# Universal Web Crawler
 
-An Apify Actor that crawls specialist information from Mount Elizabeth Medical Centre website with configurable pagination and selectors.
+A flexible web crawler that works both locally and as an Apify Actor. Designed for crawling specialist information from medical center websites with configurable pagination and selectors.
 
 ## Features
 
-- 🏥 Crawls specialist profiles from Mount Elizabeth Medical Centre
-- 🔄 Flexible pagination support (query parameters or path-based)
-- ⚙️ Fully configurable selectors and URL patterns
-- 📊 Extracts doctor names and contact details
-- 💾 Saves data in JSON format and Apify dataset
-- 🐳 Docker containerized for Apify platform
-- 🎛️ Web UI for easy configuration
-- 🛡️ **Cloudflare bypass capabilities** with multiple methods
-- 🤖 Stealth mode to avoid bot detection
-- 🔄 Automatic retry mechanism for failed requests
-- 🎭 Custom user agent and header spoofing
+- 🏥 **Dual Mode Operation**: Switch between crawling mode and scraper-only mode
+- 🎯 **Scraper-Only Mode**: Scrape specific URLs with custom selectors for targeted data extraction
+- 🔄 **Flexible Pagination**: Support for both query-based (?page=2) and path-based (/page/2/) pagination
+- ⚙️ **Fully Configurable**: Custom selectors, URL patterns, and extraction rules
+- 📊 **Medical Site Optimization**: Specialized extractors for medical/doctor websites
+- 💾 **Multiple Output Formats**: Save data in JSON format and Apify dataset
+- 🐳 **Docker Containerized**: Ready for Apify platform deployment
+- 🎛️ **Web UI Configuration**: Easy setup through Apify Console
+- 💻 **Local Development Support**: Test before deploying to Apify
+- 🛡️ **Cloudflare Bypass**: Native Playwright stealth techniques
+- 🤖 **Advanced Stealth Mode**: Avoid bot detection with smart delays and headers
+- 🔄 **Automatic Retry Mechanism**: Handle failed requests gracefully
+- 👤 **Manual Mode**: Handle challenges, captchas, and anti-bot measures manually
+- ✨ **Modern Codebase**: No deprecated dependencies, clean architecture
 
 ## Configuration
 
@@ -46,6 +49,17 @@ The actor accepts the following input parameters through the Apify platform:
 - **Headless Mode**: Run browser in headless mode
 - **Timeout**: Timeout for page operations in milliseconds
 - **Output Filename**: Custom filename for the output (optional)
+- **Manual Mode**: Enable manual intervention for handling challenges/captchas
+- **Scraper-Only Mode**: Enable scraper-only mode to scrape specific URLs instead of crawling
+
+### Scraper-Only Mode Settings
+- **URLs to Scrape**: List of specific URLs to scrape (required when Scraper-Only Mode is enabled)
+- **Custom Selectors**: Custom CSS selectors for data extraction in scraper-only mode
+  - `doctorName`: CSS selector for doctor names
+  - `position`: CSS selector for positions/specialties
+  - `phoneLinks`: CSS selector for phone number links
+  - `doctorCards`: CSS selector for doctor card containers
+  - Add any custom fields you need for your specific use case
 
 ### Cloudflare Bypass Settings
 - **Enable Cloudflare Bypass**: Enable Cloudflare challenge bypass using stealth techniques
@@ -54,7 +68,7 @@ The actor accepts the following input parameters through the Apify platform:
 - **Cloudflare Retry Attempts**: Number of retry attempts if Cloudflare challenge fails (0-5)
 - **Custom User Agent**: Custom user agent string to use for requests
 
-## Running Locally
+## Local Development
 
 ### Prerequisites
 - Node.js 18+
@@ -65,18 +79,77 @@ The actor accepts the following input parameters through the Apify platform:
 npm install
 ```
 
-### Development
-To run locally with default configuration:
+### Configuration
+The crawler automatically detects whether it's running locally or in Apify environment.
+
+#### For Local Development:
+1. Edit `src/config/local-config.js` to configure your target website
+2. Adjust selectors, URLs, and crawler settings as needed
+3. Set `headless: false` for debugging (see browser actions)
+4. Set `maxRequestsPerCrawl` to a lower number for testing
+
+#### Optional: Create Override File
+Create `src/config/local-config-override.js` to override specific settings without modifying the main config:
+
+```javascript
+export const LOCAL_CONFIG_OVERRIDE = {
+    startUrl: 'https://your-custom-site.com/specialists/',
+    headless: false,
+    maxRequestsPerCrawl: 10,
+    // ... any other settings you want to override
+};
+```
+
+### Running Locally
+
+#### Regular Crawling Mode
+```bash
+# Run with local configuration
+npm run dev
+
+# Alternative commands (all do the same thing locally)
+npm run local
+npm start
+```
+
+The crawler will:
+1. Start from the configured start URL
+2. Extract specialist profile links
+3. Follow pagination to discover all pages
+4. Visit each specialist profile and extract data
+5. Save results to a JSON file in the project root
+
+#### Scraper-Only Mode
+To use scraper-only mode locally:
+
+1. Edit `src/config/local-config.js` and set:
+```javascript
+scraperMode: true,
+scraperUrls: [
+    'https://example.com/doctor/john-smith',
+    'https://example.com/doctor/jane-doe'
+],
+customSelectors: {
+    doctorName: '.doctor-name, h3',
+    position: '.specialty, .position',
+    phoneLinks: 'a[href^="tel:"]',
+    // Add more selectors as needed
+}
+```
+
+2. Run the scraper:
 ```bash
 npm start
 ```
 
-To run with Apify Actor environment:
-```bash
-# Set input as environment variable
-export APIFY_INPUT_JSON='{"siteName": "Mount Elizabeth Medical Centre", "startUrl": "https://www.mountelizabeth.com.sg/patient-services/specialists/"}'
-npm start
-```
+The scraper will:
+1. Visit each URL in the scraperUrls array
+2. Extract data using the custom selectors
+3. Detect medical sites automatically for specialized extraction
+4. Save results to a JSON file
+
+### Testing Different Configurations
+You can test different sites by modifying the local configuration file or creating override files for different scenarios.
 
 ## Deployment to Apify
 
@@ -130,13 +203,17 @@ The actor produces:
 │   └── actor.json          # Apify Actor configuration
 ├── src/
 │   ├── config/
-│   │   └── config.js       # Static configuration (legacy)
+│   │   ├── config.js       # Static configuration (legacy)
+│   │   ├── environment.js  # Environment detection & config
+│   │   ├── local-config.js # Local development configuration
+│   │   └── local-config-override.js # Optional overrides (create manually)
 │   ├── handlers/
 │   │   ├── dataExtractor.js    # Data extraction logic
 │   │   ├── fileHandler.js      # File operations
 │   │   └── paginationHandler.js # Pagination logic
 │   ├── utils/
-│   │   └── helpers.js      # Utility functions
+│   │   ├── helpers.js      # Utility functions
+│   │   └── cloudflareBypass.js # Cloudflare bypass utilities
 │   └── main.js             # Main crawler entry point
 ├── INPUT_SCHEMA.json       # Apify input schema
 ├── Dockerfile              # Docker configuration
@@ -163,9 +240,27 @@ Modify `src/handlers/dataExtractor.js` to extract additional fields from special
 4. **Memory issues**: Reduce `maxRequestsPerCrawl` for large websites
 
 ### Debugging
-- Set `headless: false` to see the browser in action
-- Check the logs for detailed error messages
+
+#### Local Development
+- Set `headless: false` in `src/config/local-config.js` to see the browser in action
+- Reduce `maxRequestsPerCrawl` to test with fewer pages
+- Check console logs for detailed error messages
 - Use browser dev tools to verify selectors
+
+#### Apify Environment
+- Use the Apify Console logs to debug issues
+- Set headless to false temporarily for debugging (if needed)
+- Use the dataset preview to check extracted data
+
+### Environment Detection
+The crawler automatically detects the environment:
+- **Local**: Uses `src/config/local-config.js` for configuration
+- **Apify**: Uses Actor input from Apify platform
+
+### Development Workflow
+1. **Local Testing**: Configure and test locally with `npm run dev`
+2. **Deploy to Apify**: Push to Apify when local testing is successful
+3. **Production**: Use Apify Actor input schema for production runs
 
 ## License
 

@@ -17,14 +17,43 @@ export async function saveDataToFile(extractedData, config) {
     
     console.log(`\nCrawling completed! Saving ${extractedData.length} records to ${filename}`);
     
+    // Determine if this is scraper mode or crawler mode
+    const isScraperMode = config.CRAWLER?.scraperMode || false;
+    
+    // Check if this is doctor data and restructure accordingly
+    let processedData = extractedData;
+    let totalRecords = extractedData.length;
+    
+    if (isScraperMode && extractedData.length > 0 && extractedData[0].doctors) {
+        // This is doctor data, flatten it to the desired structure
+        processedData = [];
+        extractedData.forEach(pageData => {
+            if (pageData.doctors && Array.isArray(pageData.doctors)) {
+                pageData.doctors.forEach(doctor => {
+                    processedData.push({
+                        "Dr Name": doctor.name,
+                        "Position": doctor.position,
+                        "links": doctor.links || []
+                    });
+                });
+            }
+        });
+        totalRecords = processedData.length;
+    }
+    
     const jsonData = {
         siteName: config.SITE.name,
         extractedDate: new Date().toISOString().split('T')[0],
-        totalRecords: extractedData.length,
-        specialists: extractedData,
+        totalRecords: totalRecords,
+        mode: isScraperMode ? 'scraper' : 'crawler',
+        data: processedData,
+        // Keep 'specialists' for backward compatibility
+        specialists: processedData,
         metadata: {
             crawledAt: new Date().toISOString(),
-            sourceUrl: config.SITE.startUrl
+            sourceUrl: isScraperMode ? (config.SCRAPER?.urls?.[0] || config.SITE.startUrl) : config.SITE.startUrl,
+            scrapedUrls: isScraperMode ? config.SCRAPER?.urls : undefined,
+            customSelectors: isScraperMode ? config.SCRAPER?.customSelectors : undefined
         }
     };
     

@@ -1,21 +1,23 @@
-import { Actor } from 'apify';
 import { PlaywrightCrawler } from 'crawlee';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { handlePagination, handleInitialPagination } from './handlers/paginationHandler.js';
 import { shouldCrawlUrl } from './utils/helpers.js';
 import { 
-    getCloudflareBypassOptions, 
-    setupStealthMode, 
-    setupUndetectedMode,
-    handleCloudflareChallenge
-} from './utils/cloudflareBypass.js';
+    waitForManualIntervention,
+    checkForManualIntervention,
+    pauseForManualInteraction
+} from './utils/manualMode.js';
+import { runManualCrawler } from './manual-crawler.js';
+import { runScraperOnly } from './scraper-only.js';
+import { 
+    getConfiguration, 
+    handleDataOutput, 
+    handleExit 
+} from './config/environment.js';
 
-// Initialize Apify Actor
-await Actor.init();
-
-// Get input from Apify Actor
-const input = await Actor.getInput();
+// Get configuration based on environment (Apify or local)
+const { input, isApify, Actor } = await getConfiguration();
 
 // Validate required input fields
 const requiredFields = {
@@ -87,10 +89,16 @@ const CONFIG = {
         maxRequestsPerCrawl: input.maxRequestsPerCrawl,
         headless: input.headless,
         timeout: input.timeout,
+        manualMode: input.manualMode || false,
+        scraperMode: input.scraperMode || false,
         labels: {
             DETAIL: 'DETAIL',
             SPECIALISTS_LIST: 'SPECIALISTS_LIST'
         }
+    },
+    SCRAPER: {
+        urls: input.scraperUrls || [],
+        customSelectors: input.customSelectors || {}
     },
     OUTPUT: {
         getFilename: () => {
@@ -101,25 +109,64 @@ const CONFIG = {
             return `memc-specialists-${today}.json`;
         }
     },
-    CLOUDFLARE: {
-        enabled: input.cloudflareBypass || false,
-        method: input.cloudflareBypassMethod || 'stealth',
-        waitTime: input.cloudflareWaitTime || 10000,
-        retries: input.cloudflareRetries || 3,
-        userAgent: input.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
 };
 
 console.log('Starting crawler with configuration:', {
+    environment: isApify ? 'Apify' : 'Local',
     siteName: CONFIG.SITE.name,
     startUrl: CONFIG.SITE.startUrl,
     maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl,
     headless: CONFIG.CRAWLER.headless,
-    cloudflareBypass: CONFIG.CLOUDFLARE.enabled,
-    cloudflareMethod: CONFIG.CLOUDFLARE.method
+    manualMode: CONFIG.CRAWLER.manualMode,
+    scraperMode: CONFIG.CRAWLER.scraperMode,
+    scraperUrls: CONFIG.SCRAPER.urls.length
 });
 
-// Array to store all extracted data
+// Check for scraper-only mode first
+if (CONFIG.CRAWLER.scraperMode) {
+    console.log('🎯 Scraper-only mode enabled - scraping specific URLs');
+    
+    if (!CONFIG.SCRAPER.urls || CONFIG.SCRAPER.urls.length === 0) {
+        const errorMessage = '❌ SCRAPER MODE ERROR: No URLs provided for scraping. Please add URLs to the scraperUrls array in your configuration.';
+        console.error(errorMessage);
+        throw new Error(errorMessage);
+    }
+    
+    console.log(`📋 URLs to scrape: ${CONFIG.SCRAPER.urls.length}`);
+    CONFIG.SCRAPER.urls.forEach((url, index) => {
+        console.log(`   ${index + 1}. ${url}`);
+    });
+    
+    const extractedData = await runScraperOnly(CONFIG);
+    
+    // Handle data output based on environment
+    await handleDataOutput(extractedData, CONFIG, Actor, isApify);
+    
+    console.log(`✅ Scraper-only mode completed! Processed ${extractedData.length} URLs.`);
+    
+    // Handle exit based on environment
+    await handleExit(Actor, isApify);
+    // Exit here to avoid running the regular crawler
+    process.exit(0);
+}
+
+// If manual mode is enabled, use the manual crawler instead
+if (CONFIG.CRAWLER.manualMode) {
+    console.log('🎮 Manual mode enabled - using manual crawler');
+    const extractedData = await runManualCrawler(CONFIG);
+    
+    // Handle data output based on environment
+    await handleDataOutput(extractedData, CONFIG, Actor, isApify);
+    
+    console.log(`✅ Manual crawling completed! Found ${extractedData.length} specialists.`);
+    
+    // Handle exit based on environment
+    await handleExit(Actor, isApify);
+    // Exit here to avoid running the regular crawler
+    process.exit(0);
+}
+
+// Array to store all extracted data (for regular crawler)
 let extractedData = [];
 
 // Create backup of existing file if needed
@@ -127,26 +174,81 @@ createBackupIfExists(CONFIG.OUTPUT.getFilename(), CONFIG);
 
 const crawler = new PlaywrightCrawler({
     launchContext: {
-        launchOptions: getCloudflareBypassOptions(CONFIG)
+        launchOptions: {
+            headless: CONFIG.CRAWLER.headless,
+            ignoreHTTPSErrors: true
+        }
     },
-    browserPoolOptions: {
-        useFingerprints: CONFIG.CLOUDFLARE.enabled,
+    // Session pool options
+    sessionPoolOptions: {
+        blockedStatusCodes: [], // Don't auto-block any status codes (including 403, 503)
+        maxPoolSize: 1, // Single session for manual mode
+        sessionOptions: {
+            maxErrorScore: 10, // Higher tolerance for "errors" 
+            errorScoreDecrement: 0.5, // Slower error recovery
+        }
+    },
+    // Add delays between requests to avoid being detected as a bot
+    requestHandlerTimeoutSecs: 120, // Increased for manual mode
+    navigationTimeoutSecs: 60, // Increased for manual mode
+    // Add random delays between requests
+    minConcurrency: 1,
+    maxConcurrency: 1,
+    // Handle failed requests differently in manual mode
+    failedRequestHandler: async ({ request, error }) => {
+        if (CONFIG.CRAWLER.manualMode) {
+            console.log(`🚨 Request failed in manual mode: ${request.url}`);
+            console.log(`📝 Error: ${error.message}`);
+            console.log(`🔄 Attempting manual intervention...`);
+            
+            // Instead of failing, we'll try to handle this manually
+            // Create a new browser page and navigate directly
+            const browser = await request.userData?.browser;
+            if (browser) {
+                try {
+                    const context = await browser.newContext();
+                    const page = await context.newPage();
+                    
+                    console.log(`🌐 Opening page manually for: ${request.url}`);
+                    await page.goto(request.url, { 
+                        waitUntil: 'domcontentloaded',
+                        timeout: CONFIG.CRAWLER.timeout 
+                    });
+                    
+                    // Now trigger manual intervention
+                    const needsIntervention = await checkForManualIntervention(page);
+                    if (needsIntervention) {
+                        await waitForManualIntervention(page, request.url, 'Request failed with 403 - manual handling required');
+                    }
+                    
+                    await context.close();
+                    return; // Don't throw error
+                } catch (manualError) {
+                    console.log(`❌ Manual handling also failed: ${manualError.message}`);
+                }
+            }
+        }
+        
+        // For non-manual mode or if manual handling fails, throw the original error
+        console.error(`❌ Request failed: ${error.message}`);
     },
     requestHandler: async ({ page, request, enqueueLinks }) => {
+        // Add random delay between 2-5 seconds to mimic human behavior
+        const delay = Math.random() * 3000 + 2000;
+        console.log(`⏱️ Waiting ${Math.round(delay)}ms before processing request`);
+        await page.waitForTimeout(delay);
         console.log(`Processing: ${request.url}`);
         
-        // Handle Cloudflare challenges if bypass is enabled
-        if (CONFIG.CLOUDFLARE.enabled) {
-            console.log('🛡️ Cloudflare bypass enabled - checking for challenges');
-            try {
-                // Check and handle Cloudflare challenges (page is already navigated by Crawlee)
-                const challengeHandled = await handleCloudflareChallenge(page, CONFIG);
-                if (!challengeHandled) {
-                    throw new Error('Failed to handle Cloudflare challenge');
-                }
-            } catch (error) {
-                console.error(`❌ Failed to handle Cloudflare challenge: ${error.message}`);
-                throw error;
+        // Handle challenges based on mode
+        if (CONFIG.CRAWLER.manualMode) {
+            console.log('👤 Manual mode enabled - checking if intervention is needed');
+            const needsIntervention = await checkForManualIntervention(page);
+            if (needsIntervention) {
+                await waitForManualIntervention(page, request.url, 'Challenge or blocking detected');
+            } else {
+                // Still pause briefly to let you see what's happening
+                console.log('✅ No challenges detected, continuing...');
+                await page.waitForTimeout(2000);
             }
         }
         
@@ -241,22 +343,6 @@ const crawler = new PlaywrightCrawler({
             await handleInitialPagination(page, enqueueLinks, CONFIG);
         }
     },
-    preNavigationHooks: [
-        async ({ page, request }) => {
-            // Setup stealth mode for browser context if Cloudflare bypass is enabled
-            if (CONFIG.CLOUDFLARE.enabled) {
-                console.log(`🔧 Setting up Cloudflare bypass (${CONFIG.CLOUDFLARE.method}) for: ${request.url}`);
-                
-                // Setup stealth mode for browser context
-                await setupStealthMode(page.context(), CONFIG);
-                
-                // Setup undetected mode if selected
-                if (CONFIG.CLOUDFLARE.method === 'undetected' || CONFIG.CLOUDFLARE.method === 'both') {
-                    await setupUndetectedMode(page, CONFIG);
-                }
-            }
-        }
-    ],
     maxRequestsPerCrawl: CONFIG.CRAWLER.maxRequestsPerCrawl,
     headless: CONFIG.CRAWLER.headless,
 });
@@ -266,21 +352,11 @@ await crawler.run([CONFIG.SITE.startUrl]);
 // Save extracted data to JSON file
 const outputPath = await saveDataToFile(extractedData, CONFIG);
 
-// Store the results in Apify dataset
-await Actor.pushData({
-    summary: {
-        totalRecords: extractedData.length,
-        siteName: CONFIG.SITE.name,
-        startUrl: CONFIG.SITE.startUrl,
-        extractedAt: new Date().toISOString(),
-        outputFile: CONFIG.OUTPUT.getFilename()
-    },
-    specialists: extractedData
-});
+// Handle data output based on environment
+await handleDataOutput(extractedData, CONFIG, Actor, isApify);
 
 console.log(`✅ Crawling completed! Found ${extractedData.length} specialists.`);
 console.log(`📁 Data saved to: ${outputPath}`);
-console.log(`📊 Data also stored in Apify dataset`);
 
-// Exit the Actor
-await Actor.exit();
+// Handle exit based on environment
+await handleExit(Actor, isApify);
