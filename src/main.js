@@ -7,7 +7,8 @@ import { shouldCrawlUrl } from './utils/helpers.js';
 import { 
     getCloudflareBypassOptions, 
     setupStealthMode, 
-    retryWithCloudflareBypass 
+    setupUndetectedMode,
+    handleCloudflareChallenge
 } from './utils/cloudflareBypass.js';
 
 // Initialize Apify Actor
@@ -134,13 +135,17 @@ const crawler = new PlaywrightCrawler({
     requestHandler: async ({ page, request, enqueueLinks }) => {
         console.log(`Processing: ${request.url}`);
         
-        // Setup Cloudflare bypass if enabled
+        // Handle Cloudflare challenges if bypass is enabled
         if (CONFIG.CLOUDFLARE.enabled) {
-            console.log('🛡️ Cloudflare bypass enabled - setting up stealth mode');
+            console.log('🛡️ Cloudflare bypass enabled - checking for challenges');
             try {
-                await retryWithCloudflareBypass(page, request.url, CONFIG);
+                // Check and handle Cloudflare challenges (page is already navigated by Crawlee)
+                const challengeHandled = await handleCloudflareChallenge(page, CONFIG);
+                if (!challengeHandled) {
+                    throw new Error('Failed to handle Cloudflare challenge');
+                }
             } catch (error) {
-                console.error(`❌ Failed to load page with Cloudflare bypass: ${error.message}`);
+                console.error(`❌ Failed to handle Cloudflare challenge: ${error.message}`);
                 throw error;
             }
         }
@@ -240,7 +245,15 @@ const crawler = new PlaywrightCrawler({
         async ({ page, request }) => {
             // Setup stealth mode for browser context if Cloudflare bypass is enabled
             if (CONFIG.CLOUDFLARE.enabled) {
+                console.log(`🔧 Setting up Cloudflare bypass (${CONFIG.CLOUDFLARE.method}) for: ${request.url}`);
+                
+                // Setup stealth mode for browser context
                 await setupStealthMode(page.context(), CONFIG);
+                
+                // Setup undetected mode if selected
+                if (CONFIG.CLOUDFLARE.method === 'undetected' || CONFIG.CLOUDFLARE.method === 'both') {
+                    await setupUndetectedMode(page, CONFIG);
+                }
             }
         }
     ],

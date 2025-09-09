@@ -13,33 +13,54 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 export function getCloudflareBypassOptions(config) {
     const options = {
         headless: config.CRAWLER.headless,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu',
-            '--disable-features=VizDisplayCompositor',
-        ]
+        args: []
     };
+
+    // Base args for all modes
+    const baseArgs = [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--no-first-run'
+    ];
+
+    // Add headless-specific args only if running headless
+    if (config.CRAWLER.headless) {
+        baseArgs.push(
+            '--disable-gpu',
+            '--no-zygote',
+            '--disable-accelerated-2d-canvas',
+            '--disable-features=VizDisplayCompositor'
+        );
+    } else {
+        // For non-headless mode, use minimal args to avoid display issues
+        console.log('🖥️ Running in non-headless mode - browser window will be visible');
+    }
+
+    options.args.push(...baseArgs);
 
     // Add stealth options for Cloudflare bypass
     if (config.CLOUDFLARE?.enabled) {
-        options.args.push(
+        const stealthArgs = [
             '--disable-blink-features=AutomationControlled',
-            '--disable-features=VizDisplayCompositor',
             '--disable-ipc-flooding-protection',
             '--disable-renderer-backgrounding',
             '--disable-backgrounding-occluded-windows',
             '--disable-features=TranslateUI',
-            '--disable-features=BlinkGenPropertyTrees',
-            '--no-first-run',
-            '--disable-features=VizDisplayCompositor'
-        );
+            '--disable-features=BlinkGenPropertyTrees'
+        ];
+
+        // Only add VizDisplayCompositor disable in headless mode
+        if (config.CRAWLER.headless) {
+            stealthArgs.push('--disable-features=VizDisplayCompositor');
+        }
+
+        options.args.push(...stealthArgs);
+        
+        console.log(`🛡️ Cloudflare bypass enabled with method: ${config.CLOUDFLARE.method}`);
     }
 
+    console.log(`🚀 Browser launch options: headless=${options.headless}, args=${options.args.length} arguments`);
     return options;
 }
 
