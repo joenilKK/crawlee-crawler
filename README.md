@@ -11,6 +11,10 @@ An Apify Actor that crawls specialist information from Mount Elizabeth Medical C
 - 💾 Saves data in JSON format and Apify dataset
 - 🐳 Docker containerized for Apify platform
 - 🎛️ Web UI for easy configuration
+- 🛡️ **Cloudflare bypass capabilities** with multiple methods
+- 🤖 Stealth mode to avoid bot detection
+- 🔄 Automatic retry mechanism for failed requests
+- 🎭 Custom user agent and header spoofing
 
 ## Configuration
 
@@ -42,6 +46,13 @@ The actor accepts the following input parameters through the Apify platform:
 - **Headless Mode**: Run browser in headless mode
 - **Timeout**: Timeout for page operations in milliseconds
 - **Output Filename**: Custom filename for the output (optional)
+
+### Cloudflare Bypass Settings
+- **Enable Cloudflare Bypass**: Enable Cloudflare challenge bypass using stealth techniques
+- **Cloudflare Bypass Method**: Choose between stealth mode, undetected mode, or both combined
+- **Cloudflare Wait Time**: Time to wait for Cloudflare challenge to complete (5-30 seconds)
+- **Cloudflare Retry Attempts**: Number of retry attempts if Cloudflare challenge fails (0-5)
+- **Custom User Agent**: Custom user agent string to use for requests
 
 ## Running Locally
 

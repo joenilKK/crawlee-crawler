@@ -4,6 +4,11 @@ import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { handlePagination, handleInitialPagination } from './handlers/paginationHandler.js';
 import { shouldCrawlUrl } from './utils/helpers.js';
+import { 
+    getCloudflareBypassOptions, 
+    setupStealthMode, 
+    retryWithCloudflareBypass 
+} from './utils/cloudflareBypass.js';
 
 // Initialize Apify Actor
 await Actor.init();
@@ -94,6 +99,13 @@ const CONFIG = {
             const today = new Date().toISOString().split('T')[0];
             return `memc-specialists-${today}.json`;
         }
+    },
+    CLOUDFLARE: {
+        enabled: input.cloudflareBypass || false,
+        method: input.cloudflareBypassMethod || 'stealth',
+        waitTime: input.cloudflareWaitTime || 10000,
+        retries: input.cloudflareRetries || 3,
+        userAgent: input.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
 };
 
@@ -101,7 +113,9 @@ console.log('Starting crawler with configuration:', {
     siteName: CONFIG.SITE.name,
     startUrl: CONFIG.SITE.startUrl,
     maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl,
-    headless: CONFIG.CRAWLER.headless
+    headless: CONFIG.CRAWLER.headless,
+    cloudflareBypass: CONFIG.CLOUDFLARE.enabled,
+    cloudflareMethod: CONFIG.CLOUDFLARE.method
 });
 
 // Array to store all extracted data
@@ -111,8 +125,25 @@ let extractedData = [];
 createBackupIfExists(CONFIG.OUTPUT.getFilename(), CONFIG);
 
 const crawler = new PlaywrightCrawler({
+    launchContext: {
+        launchOptions: getCloudflareBypassOptions(CONFIG)
+    },
+    browserPoolOptions: {
+        useFingerprints: CONFIG.CLOUDFLARE.enabled,
+    },
     requestHandler: async ({ page, request, enqueueLinks }) => {
         console.log(`Processing: ${request.url}`);
+        
+        // Setup Cloudflare bypass if enabled
+        if (CONFIG.CLOUDFLARE.enabled) {
+            console.log('🛡️ Cloudflare bypass enabled - setting up stealth mode');
+            try {
+                await retryWithCloudflareBypass(page, request.url, CONFIG);
+            } catch (error) {
+                console.error(`❌ Failed to load page with Cloudflare bypass: ${error.message}`);
+                throw error;
+            }
+        }
         
         // Temporarily disable URL filtering for debugging
         // if (!shouldCrawlUrl(request.url, CONFIG.SITE)) {
@@ -205,6 +236,14 @@ const crawler = new PlaywrightCrawler({
             await handleInitialPagination(page, enqueueLinks, CONFIG);
         }
     },
+    preNavigationHooks: [
+        async ({ page, request }) => {
+            // Setup stealth mode for browser context if Cloudflare bypass is enabled
+            if (CONFIG.CLOUDFLARE.enabled) {
+                await setupStealthMode(page.context(), CONFIG);
+            }
+        }
+    ],
     maxRequestsPerCrawl: CONFIG.CRAWLER.maxRequestsPerCrawl,
     headless: CONFIG.CRAWLER.headless,
 });
