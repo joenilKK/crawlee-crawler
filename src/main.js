@@ -19,35 +19,50 @@ import {
 // Get configuration based on environment (Apify or local)
 const { input, isApify, Actor } = await getConfiguration();
 
-// Validate required input fields
-const requiredFields = {
-    'headless': 'Headless Mode',
-};
+// Validate required input fields only if not in scraper mode
+if (!input.scraperMode) {
+    const requiredFields = {
+        'siteName': 'Site Name',
+        'baseUrl': 'Base URL',
+        'startUrl': 'Start URL',
+        'allowedUrlPatterns': 'Allowed URL Patterns',
+        'paginationType': 'Pagination Type',
+        'specialistLinksSelector': 'Specialist Links Selector',
+        'nextButtonSelector': 'Next Button Selector',
+        'nextButtonContainerSelector': 'Next Button Container Selector',
+        'doctorNameSelector': 'Doctor Name Selector',
+        'contactLinksSelector': 'Contact Links Selector',
+        'maxRequestsPerCrawl': 'Max Requests Per Crawl',
+        'headless': 'Headless Mode',
+    };
 
-const missingFields = [];
-for (const [fieldKey, fieldName] of Object.entries(requiredFields)) {
-    if (input[fieldKey] === undefined || input[fieldKey] === null || input[fieldKey] === '') {
-        missingFields.push(fieldName);
+    const missingFields = [];
+    for (const [fieldKey, fieldName] of Object.entries(requiredFields)) {
+        if (input[fieldKey] === undefined || input[fieldKey] === null || input[fieldKey] === '') {
+            missingFields.push(fieldName);
+        }
     }
-}
 
-// Special validation for arrays
-if (input.allowedUrlPatterns && input.allowedUrlPatterns.length === 0) {
-    missingFields.push('Allowed URL Patterns (must contain at least one pattern)');
-}
+    // Special validation for arrays
+    if (input.allowedUrlPatterns && input.allowedUrlPatterns.length === 0) {
+        missingFields.push('Allowed URL Patterns (must contain at least one pattern)');
+    }
 
-// Conditional required fields based on pagination type
-if (input.paginationType === 'query' && (!input.queryPattern || input.queryPattern.trim() === '')) {
-    missingFields.push('Query Pattern (required when Pagination Type is "query")');
-}
-if (input.paginationType === 'path' && (!input.pathPattern || input.pathPattern.trim() === '')) {
-    missingFields.push('Path Pattern (required when Pagination Type is "path")');
-}
+    // Conditional required fields based on pagination type
+    if (input.paginationType === 'query' && (!input.queryPattern || input.queryPattern.trim() === '')) {
+        missingFields.push('Query Pattern (required when Pagination Type is "query")');
+    }
+    if (input.paginationType === 'path' && (!input.pathPattern || input.pathPattern.trim() === '')) {
+        missingFields.push('Path Pattern (required when Pagination Type is "path")');
+    }
 
-if (missingFields.length > 0) {
-    const errorMessage = `❌ CONFIGURATION ERROR: The following required fields are missing or empty:\n\n${missingFields.map(field => `• ${field}`).join('\n')}\n\n⚠️  All fields marked as required in the input schema must be filled out. Please provide values for all missing fields and try again.`;
-    console.error(errorMessage);
-    throw new Error(errorMessage);
+    if (missingFields.length > 0) {
+        const errorMessage = `❌ CONFIGURATION ERROR: The following required fields are missing or empty:\n\n${missingFields.map(field => `• ${field}`).join('\n')}\n\n⚠️  All fields marked as required in the input schema must be filled out. Please provide values for all missing fields and try again.`;
+        console.error(errorMessage);
+        throw new Error(errorMessage);
+    }
+} else {
+    console.log('🎯 Scraper mode enabled - skipping field validation');
 }
 
 // Create configuration object from input (no fallbacks)
@@ -102,7 +117,12 @@ const CONFIG = {
 console.log('Starting crawler with configuration:', {
     environment: isApify ? 'Apify' : 'Local',
     siteName: CONFIG.SITE.name,
+    startUrl: CONFIG.SITE.startUrl,
+    maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl,
     headless: CONFIG.CRAWLER.headless,
+    manualMode: CONFIG.CRAWLER.manualMode,
+    scraperMode: CONFIG.CRAWLER.scraperMode,
+    scraperUrls: CONFIG.SCRAPER.urls.length
 });
 
 // Check for scraper-only mode first

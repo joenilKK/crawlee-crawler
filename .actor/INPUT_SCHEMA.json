@@ -1,18 +1,8 @@
 {
-    "title": "Mount Elizabeth Medical Centre Crawler",
-    "description": "⚠️ ALL FIELDS ARE REQUIRED - Crawls specialist information from Mount Elizabeth Medical Centre website. Please fill out all required fields below.",
+    "title": "MT Alvernia Medical Centre Crawler - Scraper Mode",
+    "description": "Automatically scrapes doctor information from MT Alvernia Medical Centre website using pre-configured settings.",
     "type": "object",
     "schemaVersion": 1,
-    "properties": {
-        "headless": {
-            "title": "Headless Mode",
-            "type": "boolean",
-            "description": "Run browser in headless mode",
-            "editor": "checkbox",
-            "prefill": false
-        }
-    },
-    "required": [
-        "headless"
-    ]
+    "properties": {},
+    "required": []
 }

@@ -23,10 +23,42 @@ export async function getConfiguration() {
         await Actor.init();
         
         // Get input from Apify Actor
-        const input = await Actor.getInput();
+        let input = await Actor.getInput();
         
-        if (!input) {
-            throw new Error('❌ No input provided to Apify Actor');
+        // If no input is provided or input is empty, use default scraper mode configuration
+        if (!input || Object.keys(input).length === 0) {
+            console.log('🎯 No input provided - using default scraper mode configuration for MT Alvernia');
+            input = {
+                siteName: 'MT Alvernia Medical Centre',
+                baseUrl: 'https://mtalvernia.sg/',
+                startUrl: 'https://mtalvernia.sg/doctors/',
+                allowedUrlPatterns: ['https://mtalvernia.sg/doctors/', 'https://mtalvernia.sg/doctors/*'],
+                excludedUrlPatterns: [],
+                paginationType: 'query',
+                queryPattern: 'page={page}',
+                pathPattern: '/page/{page}/',
+                paginationBaseUrl: null,
+                startPage: 1,
+                specialistLinksSelector: 'a[href*="doctor"]',
+                nextButtonSelector: '.next, .pagination-next, [aria-label="Next"]',
+                nextButtonContainerSelector: '.pagination, .pager',
+                doctorNameSelector: 'h1, .doctor-name, .name',
+                contactLinksSelector: 'a[href*="tel"], a[href*="mailto"], .contact a',
+                maxRequestsPerCrawl: 200,
+                headless: true,
+                timeout: 10000,
+                outputFilename: 'mtalvernia-scraped-data',
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                manualMode: false,
+                scraperMode: true,
+                scraperUrls: ['https://mtalvernia.sg/doctors/'],
+                customSelectors: {
+                    doctorCards: '.doctor-card, .doctor-item, .profile-card, .specialist-card, .card',
+                    doctorName: '.doctor-name, .name, h3, h4, .title',
+                    position: '.specialty, .position, .department, p, .description',
+                    phoneLinks: '.tel_number a, a[href^="tel:"], .phone a, .contact a'
+                }
+            };
         }
         
         return { input, isApify: true, Actor };
