@@ -251,77 +251,8 @@
         "cookies": {
             "title": "🍪 Cookies (Optional)",
             "type": "array",
-            "description": "JSON array of cookies to use for authenticated scraping. Export cookies from your browser extension (EditThisCookie, Cookie-Editor, etc.) and paste them here. Useful for scraping protected/authenticated pages.",
+            "description": "JSON array of cookies to use for authenticated scraping. Export cookies from your browser extension (EditThisCookie, Cookie-Editor, etc.) and paste the entire JSON array here. Useful for scraping protected/authenticated pages.",
             "editor": "json",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "title": "Cookie Name",
-                        "type": "string",
-                        "description": "Cookie name"
-                    },
-                    "value": {
-                        "title": "Cookie Value",
-                        "type": "string",
-                        "description": "Cookie value"
-                    },
-                    "domain": {
-                        "title": "Cookie Domain",
-                        "type": "string",
-                        "description": "Cookie domain (e.g., '.example.com')"
-                    },
-                    "path": {
-                        "title": "Cookie Path",
-                        "type": "string",
-                        "description": "Cookie path (default: '/')",
-                        "default": "/"
-                    },
-                    "secure": {
-                        "title": "Secure Cookie",
-                        "type": "boolean",
-                        "description": "Whether cookie requires HTTPS",
-                        "default": false
-                    },
-                    "httpOnly": {
-                        "title": "HTTP Only",
-                        "type": "boolean",
-                        "description": "Whether cookie is HTTP-only",
-                        "default": false
-                    },
-                    "sameSite": {
-                        "title": "SameSite Policy",
-                        "type": "string",
-                        "description": "SameSite policy: 'lax', 'strict', or 'no_restriction'",
-                        "enum": ["lax", "strict", "no_restriction"],
-                        "default": "lax"
-                    },
-                    "expirationDate": {
-                        "title": "Expiration Date",
-                        "type": "integer",
-                        "description": "Cookie expiration as Unix timestamp (optional)",
-                        "minimum": 0
-                    },
-                    "hostOnly": {
-                        "title": "Host Only",
-                        "type": "boolean",
-                        "description": "Whether cookie is host-only (browser extension field)",
-                        "default": false
-                    },
-                    "session": {
-                        "title": "Session Cookie",
-                        "type": "boolean",
-                        "description": "Whether cookie is session-only (browser extension field)",
-                        "default": false
-                    },
-                    "storeId": {
-                        "title": "Store ID",
-                        "type": "string",
-                        "description": "Browser store ID (browser extension field, ignored)"
-                    }
-                },
-                "required": ["name", "value", "domain"]
-            },
             "example": [
                 {
                     "name": "session_id",
