@@ -1,13 +1,13 @@
 {
-    "title": "Web Scraper & Crawler",
-    "description": "Flexible web scraper that can crawl websites for specialist data or scrape specific URLs with custom selectors. Switch between crawling mode and scraper-only mode.",
+    "title": "Web Crawler",
+    "description": "Flexible web crawler that can crawl websites for data.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
         "siteName": {
             "title": "✅ Site Name (REQUIRED)",
             "type": "string",
-            "description": "Name of the medical center - This field is required",
+            "description": "Name of the website - This field is required",
             "editor": "textfield",
             "prefill": "Mount Elizabeth Medical Centre"
         },
@@ -92,41 +92,6 @@
             "editor": "number",
             "prefill": 1
         },
-        "specialistLinksSelector": {
-            "title": "✅ Specialist Links Selector (REQUIRED)",
-            "type": "string",
-            "description": "CSS selector for specialist profile links - This field is required",
-            "editor": "textfield",
-            "prefill": "#gridcontent-desktop a.moe-fp-view-profile"
-        },
-        "nextButtonSelector": {
-            "title": "✅ Next Button Selector (REQUIRED)",
-            "type": "string",
-            "description": "CSS selector for the next page button - This field is required",
-            "editor": "textfield",
-            "prefill": ".page-item.next a.page-link"
-        },
-        "nextButtonContainerSelector": {
-            "title": "✅ Next Button Container Selector (REQUIRED)",
-            "type": "string",
-            "description": "CSS selector for the next button container - This field is required",
-            "editor": "textfield",
-            "prefill": ".page-item.next"
-        },
-        "doctorNameSelector": {
-            "title": "✅ Doctor Name Selector (REQUIRED)",
-            "type": "string",
-            "description": "CSS selector for doctor name on detail pages - This field is required",
-            "editor": "textfield",
-            "prefill": ".profile-text .profile-name"
-        },
-        "contactLinksSelector": {
-            "title": "✅ Contact Links Selector (REQUIRED)",
-            "type": "string",
-            "description": "CSS selector for contact links on detail pages - This field is required",
-            "editor": "textfield",
-            "prefill": ".mp-pac .mp-pac-box a.moe-vp-pac"
-        },
         "maxRequestsPerCrawl": {
             "title": "✅ Max Requests Per Crawl (REQUIRED)",
             "type": "integer",
@@ -165,52 +130,10 @@
             "editor": "textfield",
             "prefill": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         },
-        "scraperMode": {
-            "title": "🎯 Scraper-Only Mode",
-            "type": "boolean",
-            "description": "Enable scraper-only mode to scrape specific URLs instead of crawling. When enabled, provide URLs in 'URLs to Scrape' field below.",
-            "editor": "checkbox",
-            "default": false
-        },
-        "scraperUrls": {
-            "title": "URLs to Scrape (Required for Scraper-Only Mode)",
-            "type": "array",
-            "description": "List of specific URLs to scrape when Scraper-Only Mode is enabled. Add one URL per line.",
-            "editor": "stringList",
-            "items": {
-                "type": "string",
-                "pattern": "^https?://"
-            },
-            "example": [
-                "https://example.com/doctor/john-smith",
-                "https://example.com/doctor/jane-doe"
-            ]
-        },
-        "customSelectors": {
-            "title": "Custom Selectors (For Scraper-Only Mode)",
-            "type": "object",
-            "description": "Custom CSS selectors for data extraction in scraper-only mode. Define selectors for the data you want to extract.",
-            "editor": "json",
-            "prefill": {
-                "doctorName": ".doctor-name, .name, h3, h4, .title",
-                "position": ".specialty, .position, .department, p, .description",
-                "phoneLinks": ".tel_number a, a[href^=\"tel:\"], .phone a, .contact a",
-                "doctorCards": ".doctor-card, .doctor-item, .profile-card, .specialist-card, .card",
-                "emailLinks": "a[href^=\"mailto:\"], .email a",
-                "education": ".education, .qualifications, .credentials",
-                "clinicAddress": ".address, .location, .clinic-address"
-            },
-            "example": {
-                "doctorName": ".doctor-name, h3",
-                "specialty": ".specialty, .position",
-                "phoneNumber": "a[href^='tel:']",
-                "email": "a[href^='mailto:']"
-            }
-        },
         "cookies": {
             "title": "🍪 Cookies (Optional)",
             "type": "array",
-            "description": "JSON array of cookies to use for authenticated scraping. Export cookies from your browser extension (EditThisCookie, Cookie-Editor, etc.) and paste the entire JSON array here. Useful for scraping protected/authenticated pages.",
+            "description": "JSON array of cookies to use for authenticated crawling. Export cookies from your browser extension (EditThisCookie, Cookie-Editor, etc.) and paste the entire JSON array here.",
             "editor": "json",
             "example": [
                 {
@@ -232,11 +155,6 @@
         "startUrl",
         "allowedUrlPatterns",
         "paginationType",
-        "specialistLinksSelector",
-        "nextButtonSelector",
-        "nextButtonContainerSelector",
-        "doctorNameSelector",
-        "contactLinksSelector",
         "maxRequestsPerCrawl",
         "headless",
         "timeout"

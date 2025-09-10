@@ -6,39 +6,41 @@
 export const LOCAL_CONFIG = {
     // Site configuration - modify these for your target site
     siteName: 'MT Alvernia',
-    baseUrl: 'https://mtalvernia.sg/',
-    startUrl: 'https://mtalvernia.sg/doctors/',
+    baseUrl: 'https://www.mountelizabeth.com.sg/',
+    startUrl: 'https://www.mountelizabeth.com.sg/',
     allowedUrlPatterns: [
-      'https://mtalvernia.sg/doctors/',
-      'https://mtalvernia.sg/doctors/*'
+      'https://www.mountelizabeth.com.sg/',
+      'https://www.mountelizabeth.com.sg/*'
     ],
-    excludedUrlPatterns: [],
+    excludedUrlPatterns: [
+      'https://www.mountelizabeth.com.sg/about/',
+    ],
     
     // Pagination settings
     paginationType: 'path', // 'query' or 'path'
     queryPattern: '', // for query pagination
-    pathPattern: '/principal/{page}/', // for path pagination
+    pathPattern: '/page/{page}/', // for path pagination
     paginationBaseUrl: null, // uses startUrl if null
     startPage: 1,
     
     // Selectors
-    specialistLinksSelector: '.list-group.list-group-flush a',
-    nextButtonSelector: '.container > div > .col-12.col-md-6 > nav > ul.pagination > li:nth-last-child(2) > a',
-    nextButtonContainerSelector: '.container > div > .col-12.col-md-6 > nav > ul.pagination',
-    doctorNameSelector: 'h1.card-title.align-self-start.mb-0.dlbg-L.dlbg-LS',
-    contactLinksSelector: '.mp-pac .mp-pac-box a.moe-vp-pac',
+    specialistLinksSelector: '.specialist-list a.thumbnail',
+    nextButtonSelector: '.pagination .pagination-next a',
+    nextButtonContainerSelector: '.pagination',
+    doctorNameSelector: '.desktop > h1',
+    contactLinksSelector: '.left-sidebar ul li a',
     
     // Crawler settings
-    maxRequestsPerCrawl: 3, // Lower for local testing
+    maxRequestsPerCrawl: 50, // Lower for local testing
     headless: false, // Set to false for local debugging
     timeout: 10000, // Request timeout in milliseconds
     
     // Scraper-only mode settings
-    scraperMode: true, // Set to true to enable scraper-only mode (no crawling/pagination)
+    scraperMode: false, // Set to true to enable scraper-only mode (no crawling/pagination)
     scraperUrls: [
         // Add specific URLs to scrape (when scraperMode is true)
         // 'https://example.com/page1',
-        'https://mtalvernia.sg/doctors/'
+        // 'https://mtalvernia.sg/doctors/'
     ],
     
     // Custom data extraction selectors (for scraper mode)
