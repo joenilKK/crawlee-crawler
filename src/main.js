@@ -173,7 +173,7 @@ if (CONFIG.CRAWLER.scraperMode) {
     const extractedData = await runScraperOnly(CONFIG);
     
     // Handle data output based on environment
-    await handleDataOutput(extractedData, CONFIG, Actor, isApify);
+    await handleDataOutput(extractedData, CONFIG, Actor, isApify, CONFIG.COOKIES);
     
     console.log(`✅ Scraper-only mode completed! Processed ${extractedData.length} URLs.`);
     
@@ -344,10 +344,10 @@ const crawler = new PlaywrightCrawler({
 await crawler.run([CONFIG.SITE.startUrl]);
 
 // Save extracted data to JSON file
-const outputPath = await saveDataToFile(extractedData, CONFIG);
+const outputPath = await saveDataToFile(extractedData, CONFIG, CONFIG.COOKIES);
 
 // Handle data output based on environment
-await handleDataOutput(extractedData, CONFIG, Actor, isApify);
+await handleDataOutput(extractedData, CONFIG, Actor, isApify, CONFIG.COOKIES);
 
 console.log(`✅ Crawling completed! Found ${extractedData.length} specialists.`);
 console.log(`📁 Data saved to: ${outputPath}`);

@@ -72,8 +72,9 @@ export async function getConfiguration() {
  * @param {Object} config - Configuration object
  * @param {Object} Actor - Apify Actor instance (null for local)
  * @param {boolean} isApify - Whether running in Apify
+ * @param {Array} originalCookies - Original cookies from input (optional)
  */
-export async function handleDataOutput(data, config, Actor, isApify) {
+export async function handleDataOutput(data, config, Actor, isApify, originalCookies = null) {
     const summary = {
         totalRecords: data.length,
         siteName: config.SITE.name,
@@ -86,7 +87,9 @@ export async function handleDataOutput(data, config, Actor, isApify) {
         // Store results in Apify dataset
         await Actor.pushData({
             summary,
-            specialists: data
+            specialists: data,
+            // Include original cookies if provided
+            cookies: originalCookies && originalCookies.length > 0 ? originalCookies : undefined
         });
         console.log(`📊 Data stored in Apify dataset`);
     } else {

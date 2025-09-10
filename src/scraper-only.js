@@ -172,7 +172,7 @@ export async function runScraperOnly(config) {
     await crawler.run(requests);
     
     // Save extracted data to JSON file
-    const outputPath = await saveDataToFile(extractedData, config);
+    const outputPath = await saveDataToFile(extractedData, config, config.COOKIES);
     console.log(`📁 Scraped data saved to: ${outputPath}`);
     
     console.log(`🎯 Scraper-only mode completed! Processed ${extractedData.length} URLs.`);

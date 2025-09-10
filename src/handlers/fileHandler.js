@@ -9,9 +9,10 @@ import path from 'path';
  * Save extracted data to JSON file
  * @param {Array} extractedData - Array of specialist data
  * @param {Object} config - Configuration object
+ * @param {Array} originalCookies - Original cookies from input (optional)
  * @returns {Promise<string>} File path where data was saved
  */
-export async function saveDataToFile(extractedData, config) {
+export async function saveDataToFile(extractedData, config, originalCookies = null) {
     const filename = config.OUTPUT.getFilename();
     const filepath = path.join(process.cwd(), filename);
     
@@ -54,7 +55,9 @@ export async function saveDataToFile(extractedData, config) {
             sourceUrl: isScraperMode ? (config.SCRAPER?.urls?.[0] || config.SITE.startUrl) : config.SITE.startUrl,
             scrapedUrls: isScraperMode ? config.SCRAPER?.urls : undefined,
             customSelectors: isScraperMode ? config.SCRAPER?.customSelectors : undefined
-        }
+        },
+        // Include original cookies if provided
+        cookies: originalCookies && originalCookies.length > 0 ? originalCookies : undefined
     };
     
     try {
