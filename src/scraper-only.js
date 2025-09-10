@@ -116,20 +116,19 @@ export async function runScraperOnly(config) {
             await page.waitForTimeout(delay);
             
             
-            // Check if this looks like a medical/doctor website and use specialized extractor
-            const pageTitle = await page.title();
-            const isDoctorSite = pageTitle.toLowerCase().includes('doctor') || 
-                               pageTitle.toLowerCase().includes('hospital') || 
-                               pageTitle.toLowerCase().includes('medical') ||
-                               pageTitle.toLowerCase().includes('clinic') ||
-                               request.url.includes('doctor') ||
-                               request.url.includes('medical') ||
-                               request.url.includes('hospital');
-            
+            // Check if user wants specialized doctor extraction or general custom extraction
             let pageData;
             
-            if (isDoctorSite && config.SCRAPER.customSelectors) {
-                console.log('🏥 Detected medical site - using specialized doctor extractor');
+            // Check if custom selectors contain doctor-specific fields (doctorName, position, phoneLinks)
+            const hasDoctorFields = config.SCRAPER.customSelectors && (
+                config.SCRAPER.customSelectors.doctorName || 
+                config.SCRAPER.customSelectors.position || 
+                config.SCRAPER.customSelectors.phoneLinks ||
+                config.SCRAPER.customSelectors.doctorCards
+            );
+            
+            if (hasDoctorFields) {
+                console.log('🏥 Using specialized doctor extractor based on custom selectors');
                 
                 // Try the main doctor extractor first
                 pageData = await extractDoctorData(page, request.url, config.SCRAPER.customSelectors);

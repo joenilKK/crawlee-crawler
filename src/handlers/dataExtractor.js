@@ -183,24 +183,65 @@ export async function extractCustomData(page, url, customSelectors = {}) {
     };
     
     try {
-        for (const [fieldName, selector] of Object.entries(customSelectors)) {
+        for (const [fieldName, selectorConfig] of Object.entries(customSelectors)) {
             try {
-                let dataType = 'text';
-                
-                // Determine data type based on field name
-                if (fieldName.toLowerCase().includes('image') || fieldName.toLowerCase().includes('img')) {
-                    dataType = 'image';
-                } else if (fieldName.toLowerCase().includes('link') || fieldName.toLowerCase().includes('url')) {
-                    dataType = 'link';
-                }
-                
-                const result = await extractWithFallback(page, selector, dataType);
-                
-                if (result !== null) {
-                    extractedData.data[fieldName] = result;
-                    console.log(`✅ Extracted ${fieldName}: ${Array.isArray(result) ? result.length + ' items' : 'data found'}`);
+                // Handle nested structure for links
+                if (Array.isArray(selectorConfig)) {
+                    console.log(`🔗 Processing nested selectors for ${fieldName}`);
+                    const nestedResults = [];
+                    
+                    for (const linkConfig of selectorConfig) {
+                        if (typeof linkConfig === 'object' && linkConfig !== null) {
+                            const linkData = {};
+                            
+                            for (const [linkName, linkSelector] of Object.entries(linkConfig)) {
+                                try {
+                                    let dataType = 'link'; // Default to link for nested structures
+                                    
+                                    // Override data type based on field name
+                                    if (linkName.toLowerCase().includes('image') || linkName.toLowerCase().includes('img')) {
+                                        dataType = 'image';
+                                    } else if (linkName.toLowerCase().includes('text') || linkName.toLowerCase().includes('title')) {
+                                        dataType = 'text';
+                                    }
+                                    
+                                    const result = await extractWithFallback(page, linkSelector, dataType);
+                                    linkData[linkName] = result;
+                                    
+                                    console.log(`  ✅ Extracted ${linkName}: ${Array.isArray(result) ? result.length + ' items' : 'data found'}`);
+                                } catch (error) {
+                                    console.log(`  ❌ Error extracting ${linkName}:`, error.message);
+                                    linkData[linkName] = null;
+                                }
+                            }
+                            
+                            nestedResults.push(linkData);
+                        }
+                    }
+                    
+                    extractedData.data[fieldName] = nestedResults;
+                } else if (typeof selectorConfig === 'string') {
+                    // Handle simple string selectors (existing functionality)
+                    let dataType = 'text';
+                    
+                    // Determine data type based on field name
+                    if (fieldName.toLowerCase().includes('image') || fieldName.toLowerCase().includes('img')) {
+                        dataType = 'image';
+                    } else if (fieldName.toLowerCase().includes('link') || fieldName.toLowerCase().includes('url')) {
+                        dataType = 'link';
+                    }
+                    
+                    const result = await extractWithFallback(page, selectorConfig, dataType);
+                    
+                    if (result !== null) {
+                        extractedData.data[fieldName] = result;
+                        console.log(`✅ Extracted ${fieldName}: ${Array.isArray(result) ? result.length + ' items' : 'data found'}`);
+                    } else {
+                        console.log(`⚠️ No data found for ${fieldName} with selector: ${selectorConfig}`);
+                        extractedData.data[fieldName] = null;
+                    }
                 } else {
-                    console.log(`⚠️ No data found for ${fieldName} with selector: ${selector}`);
+                    console.log(`⚠️ Unsupported selector configuration for ${fieldName}`);
                     extractedData.data[fieldName] = null;
                 }
                 
