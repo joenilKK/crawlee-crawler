@@ -28,7 +28,7 @@ export const LOCAL_CONFIG_OVERRIDE = {
             "expirationDate": 1757322910.775961,
             "hostOnly": false,
             "httpOnly": true,
-            "name": "__cf_bm",
+            "name": "session_token",
             "path": "/",
             "sameSite": "no_restriction",
             "secure": true,

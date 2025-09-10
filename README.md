@@ -14,7 +14,6 @@ A flexible web crawler that works both locally and as an Apify Actor. Designed f
 - 🐳 **Docker Containerized**: Ready for Apify platform deployment
 - 🎛️ **Web UI Configuration**: Easy setup through Apify Console
 - 💻 **Local Development Support**: Test before deploying to Apify
-- 🛡️ **Cloudflare Bypass**: Native Playwright stealth techniques
 - 🤖 **Advanced Stealth Mode**: Avoid bot detection with smart delays and headers
 - 🔄 **Automatic Retry Mechanism**: Handle failed requests gracefully
 - 👤 **Manual Mode**: Handle challenges, captchas, and anti-bot measures manually
@@ -106,11 +105,7 @@ The crawler supports importing cookies from browser extensions for authenticated
 
 The crawler automatically converts browser extension cookie format to Playwright format and applies them before each page navigation.
 
-### Cloudflare Bypass Settings
-- **Enable Cloudflare Bypass**: Enable Cloudflare challenge bypass using stealth techniques
-- **Cloudflare Bypass Method**: Choose between stealth mode, undetected mode, or both combined
-- **Cloudflare Wait Time**: Time to wait for Cloudflare challenge to complete (5-30 seconds)
-- **Cloudflare Retry Attempts**: Number of retry attempts if Cloudflare challenge fails (0-5)
+### Additional Settings
 - **Custom User Agent**: Custom user agent string to use for requests
 
 ## Local Development
@@ -258,7 +253,6 @@ The actor produces:
 │   │   └── paginationHandler.js # Pagination logic
 │   ├── utils/
 │   │   ├── helpers.js      # Utility functions
-│   │   └── cloudflareBypass.js # Cloudflare bypass utilities
 │   └── main.js             # Main crawler entry point
 ├── INPUT_SCHEMA.json       # Apify input schema
 ├── Dockerfile              # Docker configuration

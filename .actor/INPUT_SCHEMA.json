@@ -158,40 +158,6 @@
             "description": "Custom filename for the output (leave empty for auto-generated) - Optional field",
             "editor": "textfield"
         },
-        "cloudflareBypass": {
-            "title": "Enable Cloudflare Bypass (Optional)",
-            "type": "boolean",
-            "description": "Enable Cloudflare challenge bypass using stealth techniques - Optional field",
-            "editor": "checkbox",
-            "prefill": false
-        },
-        "cloudflareBypassMethod": {
-            "title": "Cloudflare Bypass Method (Optional)",
-            "type": "string",
-            "description": "Method to use for Cloudflare bypass - Optional field",
-            "enum": ["stealth", "undetected", "both"],
-            "enumTitles": ["Stealth Mode (playwright-extra-stealth)", "Undetected Mode (Custom headers & behavior)", "Both Methods Combined"],
-            "editor": "select",
-            "prefill": "stealth"
-        },
-        "cloudflareWaitTime": {
-            "title": "Cloudflare Wait Time (ms) (Optional)",
-            "type": "integer",
-            "description": "Time to wait for Cloudflare challenge to complete in milliseconds - Optional field",
-            "minimum": 5000,
-            "maximum": 30000,
-            "editor": "number",
-            "prefill": 10000
-        },
-        "cloudflareRetries": {
-            "title": "Cloudflare Retry Attempts (Optional)",
-            "type": "integer",
-            "description": "Number of retry attempts if Cloudflare challenge fails - Optional field",
-            "minimum": 0,
-            "maximum": 5,
-            "editor": "number",
-            "prefill": 3
-        },
         "userAgent": {
             "title": "Custom User Agent (Optional)",
             "type": "string",
