@@ -59,7 +59,8 @@ export async function getConfiguration() {
             manualMode: LOCAL_CONFIG.manualMode,
             scraperMode: LOCAL_CONFIG.scraperMode,
             scraperUrls: LOCAL_CONFIG.scraperUrls,
-            customSelectors: LOCAL_CONFIG.customSelectors
+            customSelectors: LOCAL_CONFIG.customSelectors,
+            cookies: LOCAL_CONFIG.cookies
         };
         
         return { input, isApify: false, Actor: null };

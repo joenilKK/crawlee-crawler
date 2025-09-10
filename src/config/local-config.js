@@ -55,6 +55,18 @@ export const LOCAL_CONFIG = {
     // Output settings
     outputFilename: 'mtalvernia-scraped-data', // Custom filename (will add .json automatically)
     
+    // Cookies configuration
+    cookies: [
+        // Add your cookies here in the format:
+        // {"domain":".example.com","expirationDate":1757322910.775961,"hostOnly":false,"httpOnly":true,"name":"cookie_name","path":"/","sameSite":"no_restriction","secure":true,"session":false,"storeId":"0","value":"cookie_value"}
+        // Example for ahrefs.com cookies:
+        /*
+        {"domain":".ahrefs.com","expirationDate":1757322910.775961,"hostOnly":false,"httpOnly":true,"name":"__cf_bm","path":"/","sameSite":"no_restriction","secure":true,"session":false,"storeId":"0","value":"kHzmCrr9mtRpDCCEDa4oZA0t7XOhB8K4JvwYFlJ9ZYQ-1757321110-1.0.1.1-.fCajaBZ1MUCl3DhSBbsPAmfwIuYRZFV.H1cyd_ZKVejFIk6nVkw28VLD45bQp3FNRFdvAM22LIP9PFdyoKmHaLzUr50yTuwDZvXNAqIBJk"},
+        {"domain":".ahrefs.com","expirationDate":1759913811.713249,"hostOnly":false,"httpOnly":true,"name":"BSSESSID","path":"/","sameSite":"lax","secure":true,"session":false,"storeId":"0","value":"vW5imNQD4n7UyVQyaud5TaSmszhCdnToY%2BOEsaWS"},
+        {"domain":".ahrefs.com","expirationDate":1757926614,"hostOnly":false,"httpOnly":false,"name":"intercom-session-dic5omcp","path":"/","sameSite":"lax","secure":false,"session":false,"storeId":"0","value":"dldBem80bCs1dmR3dmRGbWFYekN3N3R1enJrZGhiSENDOGRncm1lVHhnMXREY05LdkFUVTd5Zmh4dmZMK3pVc3BHVG85ZnF1VVhBaERPUWhUcTBUdVVDOVN0dzJPMkFNaTVuRFczV0hrSU09LS1CdmUrdkhnL1luT3d4ZGVLaXgxOVRBPT0=--fb3f0447eac4298a6e13a4e6120ea6898549cd6d"}
+        */
+    ],
+    
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 };
 

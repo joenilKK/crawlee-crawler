@@ -6,6 +6,7 @@ A flexible web crawler that works both locally and as an Apify Actor. Designed f
 
 - 🏥 **Dual Mode Operation**: Switch between crawling mode and scraper-only mode
 - 🎯 **Scraper-Only Mode**: Scrape specific URLs with custom selectors for targeted data extraction
+- 🍪 **Cookie Support**: Import cookies from browser extensions for authenticated scraping
 - 🔄 **Flexible Pagination**: Support for both query-based (?page=2) and path-based (/page/2/) pagination
 - ⚙️ **Fully Configurable**: Custom selectors, URL patterns, and extraction rules
 - 📊 **Medical Site Optimization**: Specialized extractors for medical/doctor websites
@@ -60,6 +61,50 @@ The actor accepts the following input parameters through the Apify platform:
   - `phoneLinks`: CSS selector for phone number links
   - `doctorCards`: CSS selector for doctor card containers
   - Add any custom fields you need for your specific use case
+
+### 🍪 Cookie Support
+
+The crawler supports importing cookies from browser extensions for authenticated scraping. This is useful for:
+- Scraping protected/authenticated pages
+- Maintaining login sessions
+- Bypassing cookie-based access controls
+
+#### How to Use Cookies in Apify:
+
+1. **Export cookies from your browser extension** (EditThisCookie, Cookie-Editor, etc.)
+2. **Copy the JSON array** of cookies
+3. **Paste into the "Cookies" field** in the Actor input configuration
+4. **Run the Actor** - cookies will be automatically applied to all requests
+
+#### Cookie Format:
+```json
+[
+  {
+    "name": "session_id",
+    "value": "abc123xyz",
+    "domain": ".example.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": "lax",
+    "expirationDate": 1757322910.775961
+  }
+]
+```
+
+#### Required Cookie Fields:
+- `name`: Cookie name
+- `value`: Cookie value  
+- `domain`: Cookie domain (e.g., '.example.com')
+
+#### Optional Cookie Fields:
+- `path`: Cookie path (default: '/')
+- `secure`: HTTPS requirement (default: false)
+- `httpOnly`: HTTP-only flag (default: false)
+- `sameSite`: SameSite policy ('lax', 'strict', 'no_restriction')
+- `expirationDate`: Unix timestamp for expiration
+
+The crawler automatically converts browser extension cookie format to Playwright format and applies them before each page navigation.
 
 ### Cloudflare Bypass Settings
 - **Enable Cloudflare Bypass**: Enable Cloudflare challenge bypass using stealth techniques

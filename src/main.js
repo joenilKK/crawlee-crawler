@@ -16,6 +16,46 @@ import {
     handleExit 
 } from './config/environment.js';
 
+/**
+ * Convert browser extension cookies to Playwright format
+ * @param {Array} cookies - Array of cookies from browser extension
+ * @returns {Array} Playwright-formatted cookies
+ */
+function convertCookiesToPlaywrightFormat(cookies) {
+    if (!cookies || !Array.isArray(cookies)) {
+        return [];
+    }
+    
+    return cookies.map(cookie => {
+        const playwrightCookie = {
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path || '/',
+            secure: cookie.secure || false,
+            httpOnly: cookie.httpOnly || false
+        };
+        
+        // Handle expiration date
+        if (cookie.expirationDate) {
+            // Convert from Unix timestamp to Date
+            playwrightCookie.expires = Math.floor(cookie.expirationDate);
+        }
+        
+        // Handle sameSite attribute
+        if (cookie.sameSite) {
+            const sameSiteMap = {
+                'no_restriction': 'None',
+                'lax': 'Lax',
+                'strict': 'Strict'
+            };
+            playwrightCookie.sameSite = sameSiteMap[cookie.sameSite] || 'Lax';
+        }
+        
+        return playwrightCookie;
+    });
+}
+
 // Get configuration based on environment (Apify or local)
 const { input, isApify, Actor } = await getConfiguration();
 
@@ -109,6 +149,7 @@ const CONFIG = {
             return `memc-specialists-${today}.json`;
         }
     },
+    COOKIES: input.cookies || [],
 };
 
 console.log('Starting crawler with configuration:', {
@@ -172,6 +213,14 @@ let extractedData = [];
 // Create backup of existing file if needed
 createBackupIfExists(CONFIG.OUTPUT.getFilename(), CONFIG);
 
+// Convert cookies to Playwright format
+const playwrightCookies = convertCookiesToPlaywrightFormat(CONFIG.COOKIES);
+
+console.log(`🍪 Loading ${playwrightCookies.length} cookies for the session`);
+if (playwrightCookies.length > 0) {
+    console.log('Cookie domains:', [...new Set(playwrightCookies.map(c => c.domain))].join(', '));
+}
+
 const crawler = new PlaywrightCrawler({
     launchContext: {
         launchOptions: {
@@ -179,6 +228,20 @@ const crawler = new PlaywrightCrawler({
             ignoreHTTPSErrors: true
         }
     },
+    // Add pre-navigation handler to set cookies
+    preNavigationHooks: [
+        async ({ page, request }) => {
+            // Set cookies before navigation if we have any
+            if (playwrightCookies.length > 0) {
+                try {
+                    await page.context().addCookies(playwrightCookies);
+                    console.log(`🍪 Applied ${playwrightCookies.length} cookies to page context`);
+                } catch (error) {
+                    console.warn(`⚠️ Failed to set some cookies: ${error.message}`);
+                }
+            }
+        }
+    ],
     // Session pool options
     sessionPoolOptions: {
         blockedStatusCodes: [], // Don't auto-block any status codes (including 403, 503)

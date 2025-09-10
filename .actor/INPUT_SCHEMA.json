@@ -247,6 +247,62 @@
                 "phoneNumber": "a[href^='tel:']",
                 "email": "a[href^='mailto:']"
             }
+        },
+        "cookies": {
+            "title": "🍪 Cookies (Optional)",
+            "type": "array",
+            "description": "JSON array of cookies to use for authenticated scraping. Export cookies from your browser extension (EditThisCookie, Cookie-Editor, etc.) and paste them here. Useful for scraping protected/authenticated pages.",
+            "editor": "json",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Cookie name"
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "Cookie value"
+                    },
+                    "domain": {
+                        "type": "string",
+                        "description": "Cookie domain (e.g., '.example.com')"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Cookie path (default: '/')"
+                    },
+                    "secure": {
+                        "type": "boolean",
+                        "description": "Whether cookie requires HTTPS"
+                    },
+                    "httpOnly": {
+                        "type": "boolean",
+                        "description": "Whether cookie is HTTP-only"
+                    },
+                    "sameSite": {
+                        "type": "string",
+                        "description": "SameSite policy: 'lax', 'strict', or 'no_restriction'"
+                    },
+                    "expirationDate": {
+                        "type": "number",
+                        "description": "Cookie expiration as Unix timestamp (optional)"
+                    }
+                },
+                "required": ["name", "value", "domain"]
+            },
+            "example": [
+                {
+                    "name": "session_id",
+                    "value": "abc123xyz",
+                    "domain": ".example.com",
+                    "path": "/",
+                    "secure": true,
+                    "httpOnly": true,
+                    "sameSite": "lax"
+                }
+            ],
+            "prefill": []
         }
     },
     "required": [

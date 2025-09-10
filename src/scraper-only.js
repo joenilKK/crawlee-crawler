@@ -13,6 +13,45 @@ import {
 
 
 /**
+ * Convert browser extension cookies to Playwright format
+ * @param {Array} cookies - Array of cookies from browser extension
+ * @returns {Array} Playwright-formatted cookies
+ */
+function convertCookiesToPlaywrightFormat(cookies) {
+    if (!cookies || !Array.isArray(cookies)) {
+        return [];
+    }
+    
+    return cookies.map(cookie => {
+        const playwrightCookie = {
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path || '/',
+            secure: cookie.secure || false,
+            httpOnly: cookie.httpOnly || false
+        };
+        
+        // Handle expiration date
+        if (cookie.expirationDate) {
+            playwrightCookie.expires = Math.floor(cookie.expirationDate);
+        }
+        
+        // Handle sameSite attribute
+        if (cookie.sameSite) {
+            const sameSiteMap = {
+                'no_restriction': 'None',
+                'lax': 'Lax',
+                'strict': 'Strict'
+            };
+            playwrightCookie.sameSite = sameSiteMap[cookie.sameSite] || 'Lax';
+        }
+        
+        return playwrightCookie;
+    });
+}
+
+/**
  * Run scraper-only mode
  * @param {Object} config - Configuration object
  * @returns {Promise<Array>} Array of extracted data
@@ -30,6 +69,14 @@ export async function runScraperOnly(config) {
     // Create backup of existing file if needed
     createBackupIfExists(config.OUTPUT.getFilename(), config);
     
+    // Convert cookies to Playwright format
+    const playwrightCookies = convertCookiesToPlaywrightFormat(config.COOKIES || []);
+    
+    console.log(`🍪 Loading ${playwrightCookies.length} cookies for scraper session`);
+    if (playwrightCookies.length > 0) {
+        console.log('Cookie domains:', [...new Set(playwrightCookies.map(c => c.domain))].join(', '));
+    }
+    
     const crawler = new PlaywrightCrawler({
         launchContext: {
             launchOptions: {
@@ -37,6 +84,20 @@ export async function runScraperOnly(config) {
                 ignoreHTTPSErrors: true
             }
         },
+        // Add pre-navigation handler to set cookies
+        preNavigationHooks: [
+            async ({ page, request }) => {
+                // Set cookies before navigation if we have any
+                if (playwrightCookies.length > 0) {
+                    try {
+                        await page.context().addCookies(playwrightCookies);
+                        console.log(`🍪 Applied ${playwrightCookies.length} cookies to scraper page context`);
+                    } catch (error) {
+                        console.warn(`⚠️ Failed to set some cookies in scraper: ${error.message}`);
+                    }
+                }
+            }
+        ],
         sessionPoolOptions: {
             blockedStatusCodes: [],
             maxPoolSize: 1,

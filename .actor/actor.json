@@ -2,7 +2,7 @@
   "actorSpecification": 1,
   "name": "web-scraper-crawler",
   "title": "Web Scraper & Crawler",
-  "description": "Flexible web scraper that can crawl websites for specialist data or scrape specific URLs with custom selectors. Supports both crawling mode for discovering pages and scraper-only mode for targeted data extraction.",
+  "description": "Flexible web scraper that can crawl websites for specialist data or scrape specific URLs with custom selectors. Supports both crawling mode for discovering pages and scraper-only mode for targeted data extraction. Includes cookie support for authenticated scraping.",
   "version": "1.0.0",
   "meta": {
     "templateId": "crawlee-playwright-js"
