@@ -19,6 +19,14 @@ import {
 // Get configuration based on environment (Apify or local)
 const { input, isApify, Actor } = await getConfiguration();
 
+// Debug logging to understand what's happening
+console.log('🔍 Debug - Input object received:', {
+    scraperMode: input.scraperMode,
+    siteName: input.siteName,
+    inputKeys: Object.keys(input),
+    inputType: typeof input
+});
+
 // Validate required input fields only if not in scraper mode
 if (!input.scraperMode) {
     const requiredFields = {
