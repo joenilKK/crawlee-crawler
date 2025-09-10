@@ -16,7 +16,7 @@ export function isApifyEnvironment() {
  */
 export async function getConfiguration() {
     if (isApifyEnvironment()) {
-        console.log('🏢 Running in Apify environment - using Actor input');
+       // console.log('🏢 Running in Apify environment - using Actor input');
         const { Actor } = await import('apify');
         
         // Initialize Actor only in Apify environment
@@ -26,14 +26,14 @@ export async function getConfiguration() {
         let input = await Actor.getInput();
         
         // Debug logging
-        console.log('🔍 Debug - Raw input from Apify:', input);
-        console.log('🔍 Debug - Input type:', typeof input);
-        console.log('🔍 Debug - Input keys:', input ? Object.keys(input) : 'null');
+      //  console.log('🔍 Debug - Raw input from Apify:', input);
+      //  console.log('🔍 Debug - Input type:', typeof input);
+       // console.log('🔍 Debug - Input keys:', input ? Object.keys(input) : 'null');
         
         // If no input is provided or input is empty, use default scraper mode configuration
         // Also handle the case where input exists but has no meaningful data
         if (!input || Object.keys(input).length === 0 || !input.siteName) {
-            console.log('🎯 No input provided - using default scraper mode configuration for MT Alvernia');
+           // console.log('🎯 No input provided - using default scraper mode configuration for MT Alvernia');
             input = {
                 siteName: 'MT Alvernia Medical Centre',
                 baseUrl: 'https://mtalvernia.sg/',
@@ -65,7 +65,7 @@ export async function getConfiguration() {
                     phoneLinks: '.tel_number a, a[href^="tel:"], .phone a, .contact a'
                 }
             };
-            console.log('✅ Default scraper mode configuration applied');
+          //  console.log('✅ Default scraper mode configuration applied');
             console.log('🔍 Debug - Final input object:', {
                 scraperMode: input.scraperMode,
                 siteName: input.siteName,
@@ -75,7 +75,7 @@ export async function getConfiguration() {
         
         return { input, isApify: true, Actor };
     } else {
-        console.log('💻 Running in local environment - using local configuration');
+      //  console.log('💻 Running in local environment - using local configuration');
         const { LOCAL_CONFIG } = await import('./local-config.js');
         
         // Convert local config to Apify input format
