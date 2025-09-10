@@ -21,19 +21,7 @@ const { input, isApify, Actor } = await getConfiguration();
 
 // Validate required input fields
 const requiredFields = {
-    'siteName': 'Site Name',
-    'baseUrl': 'Base URL',
-    'startUrl': 'Start URL',
-    'allowedUrlPatterns': 'Allowed URL Patterns',
-    'paginationType': 'Pagination Type',
-    'specialistLinksSelector': 'Specialist Links Selector',
-    'nextButtonSelector': 'Next Button Selector',
-    'nextButtonContainerSelector': 'Next Button Container Selector',
-    'doctorNameSelector': 'Doctor Name Selector',
-    'contactLinksSelector': 'Contact Links Selector',
-    'maxRequestsPerCrawl': 'Max Requests Per Crawl',
     'headless': 'Headless Mode',
-    'timeout': 'Timeout'
 };
 
 const missingFields = [];
@@ -114,12 +102,7 @@ const CONFIG = {
 console.log('Starting crawler with configuration:', {
     environment: isApify ? 'Apify' : 'Local',
     siteName: CONFIG.SITE.name,
-    startUrl: CONFIG.SITE.startUrl,
-    maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl,
     headless: CONFIG.CRAWLER.headless,
-    manualMode: CONFIG.CRAWLER.manualMode,
-    scraperMode: CONFIG.CRAWLER.scraperMode,
-    scraperUrls: CONFIG.SCRAPER.urls.length
 });
 
 // Check for scraper-only mode first
