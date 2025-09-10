@@ -257,36 +257,59 @@
                 "type": "object",
                 "properties": {
                     "name": {
+                        "title": "Cookie Name",
                         "type": "string",
                         "description": "Cookie name"
                     },
                     "value": {
+                        "title": "Cookie Value",
                         "type": "string",
                         "description": "Cookie value"
                     },
                     "domain": {
+                        "title": "Cookie Domain",
                         "type": "string",
                         "description": "Cookie domain (e.g., '.example.com')"
                     },
                     "path": {
+                        "title": "Cookie Path",
                         "type": "string",
                         "description": "Cookie path (default: '/')"
                     },
                     "secure": {
+                        "title": "Secure Cookie",
                         "type": "boolean",
                         "description": "Whether cookie requires HTTPS"
                     },
                     "httpOnly": {
+                        "title": "HTTP Only",
                         "type": "boolean",
                         "description": "Whether cookie is HTTP-only"
                     },
                     "sameSite": {
+                        "title": "SameSite Policy",
                         "type": "string",
                         "description": "SameSite policy: 'lax', 'strict', or 'no_restriction'"
                     },
                     "expirationDate": {
+                        "title": "Expiration Date",
                         "type": "number",
                         "description": "Cookie expiration as Unix timestamp (optional)"
+                    },
+                    "hostOnly": {
+                        "title": "Host Only",
+                        "type": "boolean",
+                        "description": "Whether cookie is host-only (browser extension field)"
+                    },
+                    "session": {
+                        "title": "Session Cookie",
+                        "type": "boolean",
+                        "description": "Whether cookie is session-only (browser extension field)"
+                    },
+                    "storeId": {
+                        "title": "Store ID",
+                        "type": "string",
+                        "description": "Browser store ID (browser extension field, ignored)"
                     }
                 },
                 "required": ["name", "value", "domain"]
