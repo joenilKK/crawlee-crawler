@@ -48,7 +48,7 @@ Here's a complete example configuration for scraper mode:
 export const LOCAL_CONFIG = {
     // Enable scraper-only mode
     scraperMode: true,
-    manualMode: false, // Disable other modes
+    // Basic crawler settings
     
     // URLs to scrape
     scraperUrls: [

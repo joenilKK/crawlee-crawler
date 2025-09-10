@@ -31,8 +31,7 @@ export const LOCAL_CONFIG = {
     // Crawler settings
     maxRequestsPerCrawl: 3, // Lower for local testing
     headless: false, // Set to false for local debugging
-    timeout: 60000, // Increased timeout for manual interaction
-    manualMode: true, // Enable manual mode for handling challenges
+    timeout: 10000, // Request timeout in milliseconds
     
     // Scraper-only mode settings
     scraperMode: true, // Set to true to enable scraper-only mode (no crawling/pagination)

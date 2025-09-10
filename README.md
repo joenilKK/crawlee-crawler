@@ -16,7 +16,6 @@ A flexible web crawler that works both locally and as an Apify Actor. Designed f
 - 💻 **Local Development Support**: Test before deploying to Apify
 - 🤖 **Advanced Stealth Mode**: Avoid bot detection with smart delays and headers
 - 🔄 **Automatic Retry Mechanism**: Handle failed requests gracefully
-- 👤 **Manual Mode**: Handle challenges, captchas, and anti-bot measures manually
 - ✨ **Modern Codebase**: No deprecated dependencies, clean architecture
 
 ## Configuration
@@ -49,7 +48,6 @@ The actor accepts the following input parameters through the Apify platform:
 - **Headless Mode**: Run browser in headless mode
 - **Timeout**: Timeout for page operations in milliseconds
 - **Output Filename**: Custom filename for the output (optional)
-- **Manual Mode**: Enable manual intervention for handling challenges/captchas
 - **Scraper-Only Mode**: Enable scraper-only mode to scrape specific URLs instead of crawling
 
 ### Scraper-Only Mode Settings

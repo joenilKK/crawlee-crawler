@@ -165,13 +165,6 @@
             "editor": "textfield",
             "prefill": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         },
-        "manualMode": {
-            "title": "Manual Mode",
-            "type": "boolean",
-            "description": "Enable manual intervention for handling challenges/captchas - Useful for sites with bot protection",
-            "editor": "checkbox",
-            "default": false
-        },
         "scraperMode": {
             "title": "🎯 Scraper-Only Mode",
             "type": "boolean",

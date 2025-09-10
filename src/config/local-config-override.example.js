@@ -24,7 +24,6 @@ export const LOCAL_CONFIG_OVERRIDE = {
     
     // Example: Browser settings
     // userAgent: 'Custom User Agent',
-    // manualMode: true,
     
     // Example: Custom output
     // outputFilename: 'my-custom-output.json'

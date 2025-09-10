@@ -8,7 +8,6 @@ export const SCRAPER_EXAMPLE_CONFIG = {
     scraperMode: true,
     
     // Disable other modes
-    manualMode: false,
     
     // URLs to scrape (add your target websites here)
     scraperUrls: [

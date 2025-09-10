@@ -6,10 +6,6 @@ import { PlaywrightCrawler } from 'crawlee';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { extractCustomData } from './handlers/dataExtractor.js';
 import { extractDoctorData, extractDoctorDataFallback } from './handlers/doctorExtractor.js';
-import { 
-    waitForManualIntervention,
-    checkForManualIntervention
-} from './utils/manualMode.js';
 
 
 /**
@@ -119,14 +115,6 @@ export async function runScraperOnly(config) {
             console.log(`⏱️ Waiting ${Math.round(delay)}ms before processing`);
             await page.waitForTimeout(delay);
             
-            // Handle challenges if manual mode is enabled
-            if (config.CRAWLER.manualMode) {
-                console.log('👤 Manual mode enabled - checking for challenges');
-                const needsIntervention = await checkForManualIntervention(page);
-                if (needsIntervention) {
-                    await waitForManualIntervention(page, request.url, 'Challenge detected in scraper mode');
-                }
-            }
             
             // Check if this looks like a medical/doctor website and use specialized extractor
             const pageTitle = await page.title();

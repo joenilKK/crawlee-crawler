@@ -27,7 +27,6 @@ export const LOCAL_CONFIG = {
     
     // Enable scraper-only mode
     scraperMode: true,
-    manualMode: false, // Set to true if you need to handle challenges manually
     
     // URLs to scrape in scraper-only mode
     scraperUrls: [

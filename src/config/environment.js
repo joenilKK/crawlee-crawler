@@ -56,7 +56,6 @@ export async function getConfiguration() {
             timeout: LOCAL_CONFIG.timeout,
             outputFilename: LOCAL_CONFIG.outputFilename,
             userAgent: LOCAL_CONFIG.userAgent,
-            manualMode: LOCAL_CONFIG.manualMode,
             scraperMode: LOCAL_CONFIG.scraperMode,
             scraperUrls: LOCAL_CONFIG.scraperUrls,
             customSelectors: LOCAL_CONFIG.customSelectors,

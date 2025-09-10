@@ -3,12 +3,6 @@ import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { handlePagination, handleInitialPagination } from './handlers/paginationHandler.js';
 import { shouldCrawlUrl } from './utils/helpers.js';
-import { 
-    waitForManualIntervention,
-    checkForManualIntervention,
-    pauseForManualInteraction
-} from './utils/manualMode.js';
-import { runManualCrawler } from './manual-crawler.js';
 import { runScraperOnly } from './scraper-only.js';
 import { 
     getConfiguration, 
@@ -129,7 +123,6 @@ const CONFIG = {
         maxRequestsPerCrawl: input.maxRequestsPerCrawl,
         headless: input.headless,
         timeout: input.timeout,
-        manualMode: input.manualMode || false,
         scraperMode: input.scraperMode || false,
         labels: {
             DETAIL: 'DETAIL',
@@ -158,7 +151,6 @@ console.log('Starting crawler with configuration:', {
     startUrl: CONFIG.SITE.startUrl,
     maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl,
     headless: CONFIG.CRAWLER.headless,
-    manualMode: CONFIG.CRAWLER.manualMode,
     scraperMode: CONFIG.CRAWLER.scraperMode,
     scraperUrls: CONFIG.SCRAPER.urls.length
 });
@@ -191,21 +183,6 @@ if (CONFIG.CRAWLER.scraperMode) {
     process.exit(0);
 }
 
-// If manual mode is enabled, use the manual crawler instead
-if (CONFIG.CRAWLER.manualMode) {
-    console.log('🎮 Manual mode enabled - using manual crawler');
-    const extractedData = await runManualCrawler(CONFIG);
-    
-    // Handle data output based on environment
-    await handleDataOutput(extractedData, CONFIG, Actor, isApify);
-    
-    console.log(`✅ Manual crawling completed! Found ${extractedData.length} specialists.`);
-    
-    // Handle exit based on environment
-    await handleExit(Actor, isApify);
-    // Exit here to avoid running the regular crawler
-    process.exit(0);
-}
 
 // Array to store all extracted data (for regular crawler)
 let extractedData = [];
@@ -245,54 +222,20 @@ const crawler = new PlaywrightCrawler({
     // Session pool options
     sessionPoolOptions: {
         blockedStatusCodes: [], // Don't auto-block any status codes (including 403, 503)
-        maxPoolSize: 1, // Single session for manual mode
+        maxPoolSize: 1,
         sessionOptions: {
             maxErrorScore: 10, // Higher tolerance for "errors" 
             errorScoreDecrement: 0.5, // Slower error recovery
         }
     },
     // Add delays between requests to avoid being detected as a bot
-    requestHandlerTimeoutSecs: 120, // Increased for manual mode
-    navigationTimeoutSecs: 60, // Increased for manual mode
+    requestHandlerTimeoutSecs: 60,
+    navigationTimeoutSecs: 30,
     // Add random delays between requests
     minConcurrency: 1,
     maxConcurrency: 1,
-    // Handle failed requests differently in manual mode
+    // Handle failed requests
     failedRequestHandler: async ({ request, error }) => {
-        if (CONFIG.CRAWLER.manualMode) {
-            console.log(`🚨 Request failed in manual mode: ${request.url}`);
-            console.log(`📝 Error: ${error.message}`);
-            console.log(`🔄 Attempting manual intervention...`);
-            
-            // Instead of failing, we'll try to handle this manually
-            // Create a new browser page and navigate directly
-            const browser = await request.userData?.browser;
-            if (browser) {
-                try {
-                    const context = await browser.newContext();
-                    const page = await context.newPage();
-                    
-                    console.log(`🌐 Opening page manually for: ${request.url}`);
-                    await page.goto(request.url, { 
-                        waitUntil: 'domcontentloaded',
-                        timeout: CONFIG.CRAWLER.timeout 
-                    });
-                    
-                    // Now trigger manual intervention
-                    const needsIntervention = await checkForManualIntervention(page);
-                    if (needsIntervention) {
-                        await waitForManualIntervention(page, request.url, 'Request failed with 403 - manual handling required');
-                    }
-                    
-                    await context.close();
-                    return; // Don't throw error
-                } catch (manualError) {
-                    console.log(`❌ Manual handling also failed: ${manualError.message}`);
-                }
-            }
-        }
-        
-        // For non-manual mode or if manual handling fails, throw the original error
         console.error(`❌ Request failed: ${error.message}`);
     },
     requestHandler: async ({ page, request, enqueueLinks }) => {
@@ -302,18 +245,6 @@ const crawler = new PlaywrightCrawler({
         await page.waitForTimeout(delay);
         console.log(`Processing: ${request.url}`);
         
-        // Handle challenges based on mode
-        if (CONFIG.CRAWLER.manualMode) {
-            console.log('👤 Manual mode enabled - checking if intervention is needed');
-            const needsIntervention = await checkForManualIntervention(page);
-            if (needsIntervention) {
-                await waitForManualIntervention(page, request.url, 'Challenge or blocking detected');
-            } else {
-                // Still pause briefly to let you see what's happening
-                console.log('✅ No challenges detected, continuing...');
-                await page.waitForTimeout(2000);
-            }
-        }
         
         // Temporarily disable URL filtering for debugging
         // if (!shouldCrawlUrl(request.url, CONFIG.SITE)) {

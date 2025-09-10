@@ -6,7 +6,6 @@
 export const LOCAL_CONFIG_OVERRIDE = {
     // Enable scraper-only mode
     scraperMode: true,
-    manualMode: false, // Disable manual mode when using scraper mode
     
     // URLs to scrape - replace with your target websites
     scraperUrls: [

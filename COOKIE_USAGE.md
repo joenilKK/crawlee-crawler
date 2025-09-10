@@ -150,7 +150,6 @@ export const LOCAL_CONFIG_OVERRIDE = {
     ],
     
     headless: false, // See browser for debugging
-    manualMode: true // Enable manual intervention if needed
 };
 ```
 
@@ -191,4 +190,4 @@ If you encounter issues with cookie functionality:
 1. Check the console output for cookie-related messages
 2. Verify your cookie format matches the expected structure
 3. Test with a simple site first before complex authentication flows
-4. Enable `headless: false` and `manualMode: true` for debugging
+4. Enable `headless: false` for debugging

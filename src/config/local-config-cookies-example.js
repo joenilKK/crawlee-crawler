@@ -66,6 +66,5 @@ export const LOCAL_CONFIG_OVERRIDE = {
     
     // Other settings
     headless: false, // Set to false to see the browser in action
-    manualMode: true, // Enable manual intervention if needed
     outputFilename: 'ahrefs-scraped-data'
 };
