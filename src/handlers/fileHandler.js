@@ -21,17 +21,11 @@ export async function saveDataToFile(extractedData, config, originalCookies = nu
     // Process the extracted data - restructure so each website is its own object
     const processedData = extractedData.map(record => {
         return {
-            siteName: config.SITE.name,
             extractedDate: new Date().toISOString().split('T')[0],
-            mode: 'crawler',
             url: record.url,
-            companyName: record.companyName,
-            businessOverview: record.businessOverview,
-            extractedAt: record.extractedAt,
-            metadata: {
-                crawledAt: new Date().toISOString(),
-                sourceUrl: config.SITE.startUrl
-            },
+            doctorname: record.doctorname,
+            specialty: record.specialty,
+            contact: record.contact,
             // Include original cookies if provided
             cookies: originalCookies && originalCookies.length > 0 ? originalCookies : undefined
         };

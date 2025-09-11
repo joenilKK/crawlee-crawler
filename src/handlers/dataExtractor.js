@@ -61,7 +61,36 @@ export async function extractTableData(page, config) {
 }
 
 /**
- * Extract contact details from specialist page (legacy function for compatibility)
+ * Extract specialty information from specialist page
+ * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
+ * @returns {Promise<string>} Specialty string
+ */
+export async function extractSpecialty(page, config) {
+    try {
+        const specialty = await page.evaluate((selector) => {
+            const specialtyElements = document.querySelectorAll(selector);
+            
+            // Get the first specialty found
+            for (let element of specialtyElements) {
+                const text = element.textContent.trim();
+                if (text) {
+                    return text;
+                }
+            }
+            
+            return '';
+        }, config.SELECTORS.specialty);
+        
+        return specialty;
+    } catch (error) {
+        console.error('Error extracting specialty:', error);
+        return '';
+    }
+}
+
+/**
+ * Extract contact details from specialist page
  * @param {Page} page - Playwright page object
  * @param {Object} config - Configuration object
  * @returns {Promise<Array>} Array of contact details
@@ -173,19 +202,20 @@ export async function extractSpecialistData(page, url, config) {
     console.log(`Extracting data from specialist page: ${url}`);
     
     try {
-        const companyName = await extractDoctorName(page, config);
-        const businessOverview = await extractTableData(page, config);
+        const doctorName = await extractDoctorName(page, config);
+        const specialty = await extractSpecialty(page, config);
+        const contact = await extractContactDetails(page, config);
+        const doctorinfo = await extractTableData(page, config);
         
         const specialistData = {
             url: url,
-            companyName: companyName,
-            businessOverview: businessOverview,
+            doctorname: doctorName,
+            specialty: specialty,
+            contact: contact,
+            businessOverview: doctorinfo,
             extractedAt: new Date().toISOString()
         };
-        
-        console.log(`Extracted data for: ${companyName}`);
-        console.log(`Business overview entries found: ${businessOverview.length}`);
-        
+        console.log(`Extracted data for: ${doctorName}`);
         return specialistData;
         
     } catch (error) {
@@ -193,7 +223,9 @@ export async function extractSpecialistData(page, url, config) {
         
         return {
             url: url,
-            companyName: 'Extraction failed',
+            doctorname: 'Extraction failed',
+            specialty: '',
+            contact: [],
             businessOverview: [],
             error: error.message,
             extractedAt: new Date().toISOString()

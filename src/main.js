@@ -53,8 +53,9 @@ function convertCookiesToPlaywrightFormat(cookies) {
 const { input, isApify, Actor } = await getConfiguration();
 
 // Validate required input field
-if (!input.maxRequestsPerCrawl || input.maxRequestsPerCrawl < 1) {
-    const errorMessage = `❌ CONFIGURATION ERROR: maxRequestsPerCrawl is required and must be a positive integer.`;
+if (input.maxRequestsPerCrawl === undefined || input.maxRequestsPerCrawl === null || 
+    (input.maxRequestsPerCrawl !== -1 && input.maxRequestsPerCrawl < 1)) {
+    const errorMessage = `❌ CONFIGURATION ERROR: maxRequestsPerCrawl is required and must be a positive integer or -1 for unlimited crawling.`;
     console.error(errorMessage);
     throw new Error(errorMessage);
 }
@@ -83,6 +84,7 @@ const CONFIG = {
         nextButton: LOCAL_CONFIG.nextButtonSelector,
         nextButtonContainer: LOCAL_CONFIG.nextButtonContainerSelector,
         doctorName: LOCAL_CONFIG.doctorNameSelector,
+        specialty: LOCAL_CONFIG.specialtySelector,
         contactLinks: LOCAL_CONFIG.contactLinksSelector,
         tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr'
     },
