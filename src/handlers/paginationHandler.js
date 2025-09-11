@@ -11,76 +11,111 @@ import { shouldCrawlUrl } from '../utils/helpers.js';
  * @returns {Promise<boolean>} True if next page was successfully loaded
  */
 export async function handleAjaxPagination(page, config) {
+    console.log(`   🔄 Starting AJAX pagination check...`);
+    const paginationStartTime = Date.now();
+    
     try {
         
         // Check if next button exists and is not disabled
+        console.log(`   🔍 Looking for next button with selector: ${config.SELECTORS.nextButton}`);
         const nextButton = await page.$(config.SELECTORS.nextButton);
         if (!nextButton) {
+            console.log(`   ❌ Next button not found - no more pages`);
+            console.log(`   ⏱️  Pagination check completed in ${Date.now() - paginationStartTime}ms`);
             return false;
         }
+        console.log(`   ✅ Next button found`);
         
         // Check if button is disabled
+        console.log(`   🔍 Checking if next button is disabled...`);
         const isDisabled = await page.evaluate((selector) => {
             const btn = document.querySelector(selector);
             return btn ? (btn.disabled || btn.classList.contains('disabled') || btn.getAttribute('disabled') !== null) : true;
         }, config.SELECTORS.nextButton);
         
         if (isDisabled) {
+            console.log(`   ❌ Next button is disabled - no more pages`);
+            console.log(`   ⏱️  Pagination check completed in ${Date.now() - paginationStartTime}ms`);
             return false;
         }
+        console.log(`   ✅ Next button is enabled`);
         
         // Add small delay before clicking to ensure button is ready
+        console.log(`   ⏳ Adding 1s delay before clicking next button...`);
         await page.waitForTimeout(1000);
         
         // Store current page content to compare after pagination
+        console.log(`   📊 Capturing current page content for comparison...`);
         const currentPageContent = await page.evaluate(() => {
             const links = document.querySelectorAll('.list-doctor .list-doctor__item a');
             return Array.from(links).map(link => link.href).sort();
         });
+        console.log(`   📊 Current page has ${currentPageContent.length} doctor links`);
         
         
         // Click the next button
+        console.log(`   🖱️  Clicking next button...`);
+        const clickStartTime = Date.now();
         await nextButton.click();
+        console.log(`   ✅ Next button clicked in ${Date.now() - clickStartTime}ms`);
         
         // Wait for processing class to appear on body (indicates AJAX request started)
+        console.log(`   ⏳ Waiting for processing indicator to appear: ${config.SELECTORS.processingIndicator}`);
+        const processingStartTime = Date.now();
         try {
             await page.waitForSelector(config.SELECTORS.processingIndicator, { 
                 timeout: 5000,
                 state: 'attached'
             });
+            console.log(`   ✅ Processing indicator appeared after ${Date.now() - processingStartTime}ms`);
         } catch (error) {
-            // Processing class not detected, continue anyway
+            console.log(`   ⚠️  Processing indicator not detected after ${Date.now() - processingStartTime}ms - continuing anyway`);
         }
         
         // Wait for processing class to be removed (indicates AJAX request completed)
+        console.log(`   ⏳ Waiting for processing indicator to disappear...`);
+        const processingEndTime = Date.now();
         try {
             await page.waitForSelector(config.SELECTORS.processingIndicator, { 
                 timeout: 30000,
                 state: 'detached'
             });
+            console.log(`   ✅ Processing indicator disappeared after ${Date.now() - processingEndTime}ms`);
         } catch (error) {
+            console.log(`   ⚠️  Processing indicator still present after ${Date.now() - processingEndTime}ms - using fallback delay`);
             // Fallback: wait for a longer time to handle slower responses
             await page.waitForTimeout(5000);
         }
         
         // Additional wait to ensure content is fully loaded
-        await page.waitForTimeout(config.CRAWLER.ajaxPaginationDelay || 4000);
+        const additionalDelayMs = config.CRAWLER.ajaxPaginationDelay || 4000;
+        console.log(`   ⏳ Adding additional ${additionalDelayMs}ms delay for content stability...`);
+        await page.waitForTimeout(additionalDelayMs);
         
         // Verify that page content has actually changed
+        console.log(`   🔍 Verifying that page content has changed...`);
+        const contentCheckStartTime = Date.now();
         const newPageContent = await page.evaluate(() => {
             const links = document.querySelectorAll('.list-doctor .list-doctor__item a');
             return Array.from(links).map(link => link.href).sort();
         });
+        console.log(`   📊 New page has ${newPageContent.length} doctor links (checked in ${Date.now() - contentCheckStartTime}ms)`);
         
         // Check if content actually changed
         const contentChanged = JSON.stringify(currentPageContent) !== JSON.stringify(newPageContent);
         if (!contentChanged) {
+            console.log(`   ❌ Page content did not change - pagination may have failed`);
+            console.log(`   ⏱️  Pagination attempt completed in ${Date.now() - paginationStartTime}ms`);
             return false;
         }
         
+        console.log(`   ✅ Page content changed successfully - pagination successful!`);
+        console.log(`   ⏱️  Pagination completed in ${Date.now() - paginationStartTime}ms`);
         return true;
         
     } catch (error) {
+        console.error(`   ❌ Error during AJAX pagination:`, error.message);
+        console.log(`   ⏱️  Pagination failed after ${Date.now() - paginationStartTime}ms`);
         return false;
     }
 }
