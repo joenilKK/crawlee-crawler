@@ -33,7 +33,8 @@ export async function saveDataToFile(extractedData, config) {
                     processedData.push({
                         "Dr Name": doctor.name,
                         "Position": doctor.position,
-                        "links": doctor.links || []
+                        "links": doctor.links || [],
+                        "Website": doctor.website || ''
                     });
                 });
             }

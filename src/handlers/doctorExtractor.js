@@ -28,6 +28,19 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
             const doctorElements = document.querySelectorAll(selectors.doctorCards);
             const doctorsData = [];
             
+            // Check for global website (outside of individual doctor cards)
+            let globalWebsite = '';
+            if (selectors.Website) {
+                const globalWebsiteEl = document.querySelector(selectors.Website);
+                if (globalWebsiteEl) {
+                    if (globalWebsiteEl.href) {
+                        globalWebsite = globalWebsiteEl.href;
+                    } else if (globalWebsiteEl.textContent.trim()) {
+                        globalWebsite = globalWebsiteEl.textContent.trim();
+                    }
+                }
+            }
+            
             // If no doctor cards found, try to extract from the entire page as individual lists
             if (doctorElements.length === 0) {
                 console.log('No doctor cards found, trying to extract from lists...');
@@ -52,8 +65,9 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                         // Find phone links that might be associated with this doctor
                         // This is tricky without proper containers, so we'll try to find nearby phone links
                         const nearbyPhones = [];
+                        let website = '';
                         
-                        // Look for phone links near this name element
+                        // Look for phone links and website near this name element
                         let currentElement = nameEl.parentElement;
                         let searchDepth = 0;
                         
@@ -68,6 +82,20 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                                 }
                             });
                             
+                            // Look for website
+                            if (selectors.Website) {
+                                const websiteEl = currentElement.querySelector(selectors.Website);
+                                if (websiteEl) {
+                                    if (websiteEl.href) {
+                                        // If it's a link, get the href
+                                        website = websiteEl.href;
+                                    } else if (websiteEl.textContent.trim()) {
+                                        // Otherwise get the text content
+                                        website = websiteEl.textContent.trim();
+                                    }
+                                }
+                            }
+                            
                             if (nearbyPhones.length > 0) break;
                             
                             currentElement = currentElement.parentElement;
@@ -75,6 +103,7 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                         }
                         
                         doctorData.links = nearbyPhones;
+                        doctorData.website = website || globalWebsite;
                         doctorsData.push(doctorData);
                     }
                 }
@@ -106,11 +135,25 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                         }
                     });
                     
+                    // Extract website from within this card, or use global website
+                    const websiteEl = card.querySelector(selectors.Website);
+                    let website = globalWebsite; // Use global website as default
+                    if (websiteEl) {
+                        if (websiteEl.href) {
+                            // If it's a link, get the href
+                            website = websiteEl.href;
+                        } else if (websiteEl.textContent.trim()) {
+                            // Otherwise get the text content
+                            website = websiteEl.textContent.trim();
+                        }
+                    }
+                    
                     if (name) {
                         doctorsData.push({
                             name: name,
                             position: position,
-                            links: phoneLinks
+                            links: phoneLinks,
+                            website: website
                         });
                     }
                 } catch (cardError) {
@@ -124,7 +167,8 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
             doctorCards: doctorCards,
             doctorName: customSelectors.doctorName || '.doctor-name, .name, h3, h4, .title',
             position: customSelectors.position || '.specialty, .position, .department, p, .description',
-            phoneLinks: customSelectors.phoneLinks || '.tel_number a, a[href^="tel:"], .phone a, .contact a'
+            phoneLinks: customSelectors.phoneLinks || '.tel_number a, a[href^="tel:"], .phone a, .contact a',
+            Website: customSelectors.Website || ''
         });
         
         extractedData.doctors = doctors;
@@ -164,6 +208,19 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
         const doctors = await page.evaluate((selectors) => {
             const doctorsData = [];
             
+            // Check for global website (outside of individual doctor cards)
+            let globalWebsite = '';
+            if (selectors.Website) {
+                const globalWebsiteEl = document.querySelector(selectors.Website);
+                if (globalWebsiteEl) {
+                    if (globalWebsiteEl.href) {
+                        globalWebsite = globalWebsiteEl.href;
+                    } else if (globalWebsiteEl.textContent.trim()) {
+                        globalWebsite = globalWebsiteEl.textContent.trim();
+                    }
+                }
+            }
+            
             // Method 1: Look for name-position-phone patterns
             const nameElements = document.querySelectorAll(selectors.doctorName);
             
@@ -202,9 +259,10 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
                     searchCount++;
                 }
                 
-                // Look for phone links in the vicinity
+                // Look for phone links and website in the vicinity
                 let parentEl = nameEl.parentElement;
                 let parentSearchCount = 0;
+                let website = '';
                 
                 while (parentEl && parentSearchCount < 3) {
                     const phoneEls = parentEl.querySelectorAll(selectors.phoneLinks);
@@ -218,6 +276,20 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
                         }
                     });
                     
+                    // Look for website
+                    if (selectors.Website) {
+                        const websiteEl = parentEl.querySelector(selectors.Website);
+                        if (websiteEl) {
+                            if (websiteEl.href) {
+                                // If it's a link, get the href
+                                website = websiteEl.href;
+                            } else if (websiteEl.textContent.trim()) {
+                                // Otherwise get the text content
+                                website = websiteEl.textContent.trim();
+                            }
+                        }
+                    }
+                    
                     if (links.length > 0) break;
                     
                     parentEl = parentEl.parentElement;
@@ -227,7 +299,8 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
                 doctorsData.push({
                     name: name,
                     position: position,
-                    links: links
+                    links: links,
+                    website: website || globalWebsite
                 });
             });
             
@@ -236,7 +309,8 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
         }, {
             doctorName: customSelectors.doctorName || '.doctor-name, .name, h3, h4, .title',
             position: customSelectors.position || '.specialty, .position, .department, p, .description',
-            phoneLinks: customSelectors.phoneLinks || '.tel_number a, a[href^="tel:"], .phone a, .contact a'
+            phoneLinks: customSelectors.phoneLinks || '.tel_number a, a[href^="tel:"], .phone a, .contact a',
+            Website: customSelectors.Website || ''
         });
         
         return {

@@ -1,36 +1,25 @@
 /**
- * Configuration settings for the Mount Elizabeth crawler
+ * Configuration settings for the MT Alvernia crawler
  */
 
 export const CONFIG = {
     // Site configuration
     SITE: {
-        name: 'Mount Elizabeth Medical Centre',
-        baseUrl: 'https://www.mountelizabeth.com.sg/',
-        startUrl: 'https://www.mountelizabeth.com.sg/patient-services/specialists/',
+        name: 'MT Alvernia',
+        baseUrl: 'https://mtalvernia.sg/',
+        startUrl: 'https://mtalvernia.sg/doctors/',
         allowedUrlPatterns: [
-            'https://www.mountelizabeth.com.sg/patient-services/specialists/',
-            'https://www.mountelizabeth.com.sg/patient-services/specialists/*'
+            'https://mtalvernia.sg/doctors/',
+            'https://mtalvernia.sg/doctors/*'
         ],
         // Patterns to exclude (optional)
-        excludedUrlPatterns: [
-            'https://www.mountelizabeth.com.sg/patient-services/specialty_areas/*',
-            'https://www.mountelizabeth.com.sg/patient-services/health-screening/*',
-            'https://www.mountelizabeth.com.sg/patient-services/about/*'
-        ],
+        excludedUrlPatterns: [],
         // Pagination configuration
         pagination: {
             // Type of pagination: 'query' (e.g., ?page=2) or 'path' (e.g., /page/2/)
-            // example for query
-            //type: 'query',
-            // queryPattern: 'page={page}',
-            //==============================================
-            // example for path
-            //type: 'path',
-            //pathPattern: '/page/{page}/',
-
-            type: 'query',
-            queryPattern: 'page={page}',
+            type: 'path',
+            queryPattern: '', // for query pagination
+            pathPattern: '/principal/{page}/', // for path pagination
             // Base URL for pagination (if different from startUrl)
             baseUrl: null, // Uses startUrl by default
             // Starting page number (usually 1)
@@ -41,31 +30,55 @@ export const CONFIG = {
     // Selectors for web scraping
     SELECTORS: {
         // Specialist listing page selectors
-        specialistLinks: '#gridcontent-desktop a.moe-fp-view-profile',
-        nextButton: '.page-item.next a.page-link',
-        nextButtonContainer: '.page-item.next',
+        specialistLinks: '.list-group.list-group-flush a',
+        nextButton: '.container > div > .col-12.col-md-6 > nav > ul.pagination > li:nth-last-child(2) > a',
+        nextButtonContainer: '.container > div > .col-12.col-md-6 > nav > ul.pagination',
         
         // Specialist detail page selectors
-        doctorName: '.profile-text .profile-name',
+        doctorName: 'h1.card-title.align-self-start.mb-0.dlbg-L.dlbg-LS',
         contactLinks: '.mp-pac .mp-pac-box a.moe-vp-pac'
     },
 
     // Crawler settings
     CRAWLER: {
-        maxRequestsPerCrawl: 200,
-        headless: true, // Set to true for production
-        timeout: 10000,
+        maxRequestsPerCrawl: 3, // Lower for local testing
+        headless: false, // Set to false for local debugging
+        timeout: 60000, // Increased timeout for manual interaction
+        manualMode: true, // Enable manual mode for handling challenges
+        scraperMode: true, // Set to true to enable scraper-only mode (no crawling/pagination)
         labels: {
             DETAIL: 'DETAIL',
             SPECIALISTS_LIST: 'SPECIALISTS_LIST'
         }
     },
 
+    // Scraper-only mode settings
+    SCRAPER: {
+        urls: [
+            // Add specific URLs to scrape (when scraperMode is true)
+            // 'https://example.com/page1',
+            'https://mtalvernia.sg/doctors/'
+        ],
+        
+        // Custom data extraction selectors (for scraper mode)
+        customSelectors: {
+            // Define selectors for doctor cards/containers
+            doctorCards: '.doctor-card, .doctor-item, .profile-card, .specialist-card, .card',
+            doctorName: 'h4.doctor-name',
+            position: '.wrap.top_wrap .right > p',
+            phoneLinks: '.tel_number a',
+            Website: '.wrap .right p a',
+            // You can add more custom selectors as needed
+        }
+    },
+
     // File output settings
     OUTPUT: {
         getFilename: () => {
-            const today = new Date().toISOString().split('T')[0];
-            return `memc-specialists-${today}.json`;
+            return 'mtalvernia-scraped-data.json';
         }
-    }
+    },
+
+    // User agent
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 };
