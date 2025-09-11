@@ -5,37 +5,40 @@
 
 export const LOCAL_CONFIG = {
     // Site configuration - modify these for your target site
-    siteName: 'Camden Medical Centre',
-    baseUrl: 'https://www.camden.com.sg//',
-    startUrl: 'https://www.camden.com.sg/find-a-doctor?type=doctor&sid=all&search=&page=1',
+    siteName: 'Farrer Park Hospital',
+    baseUrl: 'https://www.farrerpark.com/',
+    startUrl: 'https://www.farrerpark.com/patients-and-visitors/doctor.html',
     allowedUrlPatterns: [
-      'https://www.camden.com.sg/find-a-doctor?type=doctor&sid=all&search=&page=*',
-      'https://www.camden.com.sg/specialist/*',
+      'https://www.farrerpark.com/patients-and-visitors/doctor/detail.html?id=*',
+      'https://www.farrerpark.com/patients-and-visitors/doctor/detail.html?id=*',
     ],
-    excludedUrlPatterns: [
-      'https://www.camden.com.sg/corporate/about/',
-    ],
+    excludedUrlPatterns: [],
     
-    // Pagination settings
-    paginationType: 'query', // 'query' or 'path'
+    // Pagination settings - AJAX pagination (URL doesn't change)
+    paginationType: 'ajax', // 'query', 'path', or 'ajax'
     queryPattern: 'page={page}', // for query pagination
     pathPattern: '', // for path pagination
     paginationBaseUrl: null, // uses startUrl if null
     startPage: 1,
     
-    // Selectors
-    specialistLinksSelector: '.profilepic a.profileurl',
-    nextButtonSelector: '.list-paginationcontainer .list-pagenext',
-    nextButtonContainerSelector: '.list-paginationcontainer',
-    doctorNameSelector: 'h1.masthead-title',
-    specialtySelector: '.doc-personalinfo .col .grid-box a',
-    contactLinksSelector: '.clinic-contacts a',
-    tableRowsSelector: '.clinic-contacts .grid a',
+    // Selectors for Farrer Park
+    specialistLinksSelector: '.list-doctor .list-doctor__view a',
+    nextButtonSelector: '.pagination-next #nextBtn',
+    nextButtonContainerSelector: '.pagination-next',
+    processingIndicatorSelector: 'body.processing',
+    doctorNameSelector: '.doctor-banner .doctor-profile h1',
+    specialtySelector: '.doctor-profile__item:first-child .doctor-profile__item-detail',
+    contactLinksSelector: '.clinic-item a',
+    tableRowsSelector: '.doctor-info table tr, .profile-details table tr',
     
     // Crawler settings
-    maxRequestsPerCrawl: -1, // Lower for local testing, use -1 for unlimited crawling
+    maxRequestsPerCrawl: 5, // Lower for local testing, use -1 for unlimited crawling
     headless: false, // Set to false for local debugging
-    timeout: 10000, // Request timeout in milliseconds
+    timeout: 30000, // Request timeout in milliseconds (increased from 15s to 30s)
+    delayBetweenLinks: 3000, // Delay in milliseconds between processing each doctor link (reduced from 4s to 3s)
+    delayBeforeNavigation: 2000, // Delay before navigating to each doctor page
+    delayAfterPageLoad: 5000, // Delay after page loads to ensure stability (increased from 3s to 5s)
+    ajaxPaginationDelay: 6000, // Extra delay for AJAX pagination (increased from 4s to 6s)
     
     
     // Output settings

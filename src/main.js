@@ -1,7 +1,7 @@
 import { PlaywrightCrawler } from 'crawlee';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
-import { handlePagination, handleInitialPagination } from './handlers/paginationHandler.js';
+import { handlePagination, handleInitialPagination, handleAjaxPagination } from './handlers/paginationHandler.js';
 import { shouldCrawlUrl } from './utils/helpers.js';
 import { 
     getConfiguration, 
@@ -83,6 +83,7 @@ const CONFIG = {
         specialistLinks: LOCAL_CONFIG.specialistLinksSelector,
         nextButton: LOCAL_CONFIG.nextButtonSelector,
         nextButtonContainer: LOCAL_CONFIG.nextButtonContainerSelector,
+        processingIndicator: LOCAL_CONFIG.processingIndicatorSelector,
         doctorName: LOCAL_CONFIG.doctorNameSelector,
         specialty: LOCAL_CONFIG.specialtySelector,
         contactLinks: LOCAL_CONFIG.contactLinksSelector,
@@ -92,6 +93,10 @@ const CONFIG = {
         maxRequestsPerCrawl: input.maxRequestsPerCrawl,
         headless: input.headless !== undefined ? input.headless : LOCAL_CONFIG.headless,
         timeout: LOCAL_CONFIG.timeout,
+        delayBetweenLinks: LOCAL_CONFIG.delayBetweenLinks || 2000,
+        delayBeforeNavigation: LOCAL_CONFIG.delayBeforeNavigation || 2000,
+        delayAfterPageLoad: LOCAL_CONFIG.delayAfterPageLoad || 3000,
+        ajaxPaginationDelay: LOCAL_CONFIG.ajaxPaginationDelay || 4000,
         userAgent: LOCAL_CONFIG.userAgent,
         labels: {
             DETAIL: 'DETAIL',
@@ -117,16 +122,13 @@ const CONFIG = {
     COOKIES: input.cookies && input.cookies.length > 0 ? input.cookies : (LOCAL_CONFIG.cookies || []),
 };
 
-console.log('Starting crawler with configuration:', {
-    environment: isApify ? 'Apify' : 'Local',
-    siteName: CONFIG.SITE.name,
-    startUrl: CONFIG.SITE.startUrl,
-    maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl === -1 ? 'unlimited' : CONFIG.CRAWLER.maxRequestsPerCrawl,
-    headless: CONFIG.CRAWLER.headless
-});
+// Starting crawler silently
 
 // Array to store all extracted data (for regular crawler)
 let extractedData = [];
+
+// Set to track processed URLs to avoid duplicates
+let processedUrls = new Set();
 
 // Create backup of existing file if needed
 createBackupIfExists(CONFIG.OUTPUT.getFilename(), CONFIG);
@@ -134,10 +136,6 @@ createBackupIfExists(CONFIG.OUTPUT.getFilename(), CONFIG);
 // Convert cookies to Playwright format
 const playwrightCookies = convertCookiesToPlaywrightFormat(CONFIG.COOKIES);
 
-console.log(`🍪 Loading ${playwrightCookies.length} cookies for the session`);
-if (playwrightCookies.length > 0) {
-    console.log('Cookie domains:', [...new Set(playwrightCookies.map(c => c.domain))].join(', '));
-}
 
 const crawler = new PlaywrightCrawler({
     launchContext: {
@@ -163,13 +161,12 @@ const crawler = new PlaywrightCrawler({
     // Add pre-navigation handler to set cookies
     preNavigationHooks: [
         async ({ page, request }) => {
-            // Set cookies before navigation if we have any
+                            // Set cookies before navigation if we have any
             if (playwrightCookies.length > 0) {
                 try {
                     await page.context().addCookies(playwrightCookies);
-                    console.log(`🍪 Applied ${playwrightCookies.length} cookies to page context`);
                 } catch (error) {
-                    console.warn(`⚠️ Failed to set some cookies: ${error.message}`);
+                    // Silently handle cookie setting errors
                 }
             }
         }
@@ -184,21 +181,21 @@ const crawler = new PlaywrightCrawler({
         }
     },
     // Add delays between requests to avoid being detected as a bot
-    requestHandlerTimeoutSecs: 60,
-    navigationTimeoutSecs: 30,
+    requestHandlerTimeoutSecs: 180, // Increased from 60 to 180 seconds
+    navigationTimeoutSecs: 60, // Increased from 30 to 60 seconds
     // Add random delays between requests
     minConcurrency: 1,
     maxConcurrency: 1,
-    // Handle failed requests
+    // Handle failed requests with retry logic
     failedRequestHandler: async ({ request, error }) => {
-        console.error(`❌ Request failed: ${error.message}`);
+        // Silently handle failed requests
     },
+    // Increase max retries but with specific conditions
+    maxRequestRetries: 2,
     requestHandler: async ({ page, request, enqueueLinks }) => {
         // Add random delay between 2-5 seconds to mimic human behavior
         const delay = Math.random() * 3000 + 2000;
-        console.log(`⏱️ Waiting ${Math.round(delay)}ms before processing request`);
         await page.waitForTimeout(delay);
-        console.log(`Processing: ${request.url}`);
         
         
         // Temporarily disable URL filtering for debugging
@@ -207,89 +204,133 @@ const crawler = new PlaywrightCrawler({
         //     return;
         // }
         
-        if (request.label === CONFIG.CRAWLER.labels.DETAIL) {
-            // Extract specialist data from detail page
-            const specialistData = await extractSpecialistData(page, request.url, CONFIG);
-            extractedData.push(specialistData);
+        // Handle all processing on the main specialists listing page
+        {
+            // This is the initial page load - handle AJAX pagination efficiently
             
-        } else if (request.label === CONFIG.CRAWLER.labels.SPECIALISTS_LIST) {
-            // We are on a specialists listing page (page 2, 3, etc.)
-            console.log(`Processing specialists listing page: ${request.url}`);
+            console.log("Extracting....");
             
-            // Wait for the specialists content to load
-            await page.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
+            let currentPage = 1;
+            let hasMorePages = true;
+            let totalDoctorsProcessed = 0;
             
-            // Enqueue all specialist profile links (debugging - no filtering)
-            await enqueueLinks({
-                selector: CONFIG.SELECTORS.specialistLinks,
-                label: CONFIG.CRAWLER.labels.DETAIL,
-                // transformRequestFunction: (req) => {
-                //     // Filter URLs before adding to queue
-                //     if (!shouldCrawlUrl(req.url, CONFIG.SITE)) {
-                //         console.log(`Filtered out URL: ${req.url}`);
-                //         return false; // Don't add to queue
-                //     }
-                //     return req;
-                // }
-            });
-            
-            // Handle pagination to next page
-            await handlePagination(page, request.url, enqueueLinks, CONFIG);
-            
-        } else {
-            // This is the initial page load
-            console.log('Starting on specialists page');
-            console.log(`Looking for selector: ${CONFIG.SELECTORS.specialistLinks}`);
-            
-            try {
-                // Wait for the specialists content to load
-                await page.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
-                console.log('✅ Specialist links selector found!');
-            } catch (error) {
-                console.log('❌ Specialist links selector NOT found. Trying to find what IS on the page...');
+            while (hasMorePages) {
                 
-                // Debug: Check what's actually on the page
-                const pageContent = await page.evaluate(() => {
-                    return {
-                        title: document.title,
-                        url: window.location.href,
-                        bodyText: document.body ? document.body.innerText.substring(0, 500) : 'No body',
-                        linkCount: document.querySelectorAll('a').length,
-                        divCount: document.querySelectorAll('div').length
-                    };
-                });
-                console.log('Page content:', pageContent);
-                
-                // Try to find any links that might be specialist links
-                const allLinks = await page.evaluate(() => {
-                    const links = Array.from(document.querySelectorAll('a'));
-                    return links.slice(0, 10).map(link => ({
-                        text: link.textContent.trim(),
-                        href: link.href,
-                        className: link.className
-                    }));
-                });
-                console.log('First 10 links on page:', allLinks);
-                
-                throw error;
+                try {
+                    // Wait for the specialists content to load
+                    await page.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
+                    
+                    // Get all doctor links on current page
+                    const doctorLinks = await page.evaluate((selector) => {
+                        const links = Array.from(document.querySelectorAll(selector));
+                        return links.map(link => ({
+                            url: link.href,
+                            text: link.textContent.trim()
+                        }));
+                    }, CONFIG.SELECTORS.specialistLinks);
+                    
+                    
+                     // Process each doctor on this page immediately
+                     for (let i = 0; i < doctorLinks.length; i++) {
+                         // Check if we've reached the maximum number of SUCCESSFULLY EXTRACTED doctors
+                         if (CONFIG.CRAWLER.maxRequestsPerCrawl !== -1 && totalDoctorsProcessed >= CONFIG.CRAWLER.maxRequestsPerCrawl) {
+                             hasMorePages = false;
+                             break;
+                         }
+                        
+                        const doctor = doctorLinks[i];
+                        
+                        // Skip if we've already processed this URL
+                        if (processedUrls.has(doctor.url)) {
+                            continue;
+                        }
+                        
+                        // Add URL to processed set
+                        processedUrls.add(doctor.url);
+                        
+                        
+                        // Add delay before processing each doctor link to avoid overwhelming the server
+                        if (i > 0 || currentPage > 1) { // Skip delay for the very first doctor
+                            await page.waitForTimeout(CONFIG.CRAWLER.delayBetweenLinks);
+                        }
+                        
+                        let doctorPage = null;
+                        try {
+                            // Add delay before navigation to avoid overwhelming the server
+                            await page.waitForTimeout(CONFIG.CRAWLER.delayBeforeNavigation);
+                            
+                            // Open doctor detail page in new tab
+                            doctorPage = await page.context().newPage();
+                            
+                            // Set longer timeout for navigation
+                            await doctorPage.goto(doctor.url, { 
+                                waitUntil: 'networkidle',
+                                timeout: 60000 // 60 second timeout for navigation
+                            });
+                            
+                            // Wait for page to be fully stable after load
+                            await doctorPage.waitForTimeout(CONFIG.CRAWLER.delayAfterPageLoad);
+                            
+                            // Extract doctor data
+                            const doctorData = await extractSpecialistData(doctorPage, doctor.url, CONFIG);
+                            
+                            // Only add valid data and increment counter for valid records
+                            if (doctorData) {
+                                extractedData.push(doctorData);
+                                totalDoctorsProcessed++;
+                            }
+                            
+                        } catch (error) {
+                            // Silently handle errors during extraction
+                        } finally {
+                            // Always close the doctor page in finally block
+                            if (doctorPage && !doctorPage.isClosed()) {
+                                try {
+                                    await doctorPage.close();
+                                } catch (closeError) {
+                                    // Ignore close errors
+                                }
+                            }
+                            
+                            // Additional small delay after processing
+                            try {
+                                await page.waitForTimeout(1500);
+                            } catch (timeoutError) {
+                                // Ignore timeout errors if main page is closed
+                            }
+                        }
+                    }
+                    
+                     // After processing all doctors on current page, check if we should continue to next page
+                     // Don't continue if we've reached the maximum limit of successfully extracted doctors
+                     if (CONFIG.CRAWLER.maxRequestsPerCrawl !== -1 && totalDoctorsProcessed >= CONFIG.CRAWLER.maxRequestsPerCrawl) {
+                         hasMorePages = false;
+                    } else if (CONFIG.SITE.pagination.type === 'ajax') {
+                        hasMorePages = await handleAjaxPagination(page, CONFIG);
+                        
+                        if (hasMorePages) {
+                            currentPage++;
+                            // Extended delay to ensure page is fully loaded and stable
+                            await page.waitForTimeout(CONFIG.CRAWLER.ajaxPaginationDelay);
+                        }
+                    } else {
+                        // Fallback to traditional pagination if not AJAX
+                        hasMorePages = await handleInitialPagination(page, enqueueLinks, CONFIG);
+                        if (hasMorePages) currentPage++;
+                    }
+                    
+                } catch (error) {
+                    // Silently handle page errors
+                    if (error.message.includes('Target page, context or browser has been closed')) {
+                        hasMorePages = false; // Stop if browser/context is closed
+                    } else {
+                        // For other errors, try to continue to next page
+                        hasMorePages = false; // For now, stop on any error to be safe
+                    }
+                }
             }
             
-            // Enqueue all specialist profile links from the first page (debugging - no filtering)
-            await enqueueLinks({
-                selector: CONFIG.SELECTORS.specialistLinks,
-                label: CONFIG.CRAWLER.labels.DETAIL,
-                // transformRequestFunction: (req) => {
-                //     // Filter URLs before adding to queue
-                //     if (!shouldCrawlUrl(req.url, CONFIG.SITE)) {
-                //         console.log(`Filtered out URL: ${req.url}`);
-                //         return false; // Don't add to queue
-                //     }
-                //     return req;
-                // }
-            });
-            
-            // Handle pagination for the first page
-            await handleInitialPagination(page, enqueueLinks, CONFIG);
+            console.log("Done Extracting");
         }
     },
     maxRequestsPerCrawl: CONFIG.CRAWLER.maxRequestsPerCrawl === -1 ? undefined : CONFIG.CRAWLER.maxRequestsPerCrawl,
@@ -304,8 +345,7 @@ const outputPath = await saveDataToFile(extractedData, CONFIG, CONFIG.COOKIES);
 // Handle data output based on environment
 await handleDataOutput(extractedData, CONFIG, Actor, isApify, CONFIG.COOKIES);
 
-console.log(`✅ Crawling completed! Found ${extractedData.length} specialists.`);
-console.log(`📁 Data saved to: ${outputPath}`);
+// Crawling completed silently
 
 // Handle exit based on environment
 await handleExit(Actor, isApify);

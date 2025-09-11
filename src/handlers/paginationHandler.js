@@ -5,6 +5,87 @@
 import { shouldCrawlUrl } from '../utils/helpers.js';
 
 /**
+ * Handle AJAX pagination by clicking next button and waiting for content to load
+ * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
+ * @returns {Promise<boolean>} True if next page was successfully loaded
+ */
+export async function handleAjaxPagination(page, config) {
+    try {
+        
+        // Check if next button exists and is not disabled
+        const nextButton = await page.$(config.SELECTORS.nextButton);
+        if (!nextButton) {
+            return false;
+        }
+        
+        // Check if button is disabled
+        const isDisabled = await page.evaluate((selector) => {
+            const btn = document.querySelector(selector);
+            return btn ? (btn.disabled || btn.classList.contains('disabled') || btn.getAttribute('disabled') !== null) : true;
+        }, config.SELECTORS.nextButton);
+        
+        if (isDisabled) {
+            return false;
+        }
+        
+        // Add small delay before clicking to ensure button is ready
+        await page.waitForTimeout(1000);
+        
+        // Store current page content to compare after pagination
+        const currentPageContent = await page.evaluate(() => {
+            const links = document.querySelectorAll('.list-doctor .list-doctor__item a');
+            return Array.from(links).map(link => link.href).sort();
+        });
+        
+        
+        // Click the next button
+        await nextButton.click();
+        
+        // Wait for processing class to appear on body (indicates AJAX request started)
+        try {
+            await page.waitForSelector(config.SELECTORS.processingIndicator, { 
+                timeout: 5000,
+                state: 'attached'
+            });
+        } catch (error) {
+            // Processing class not detected, continue anyway
+        }
+        
+        // Wait for processing class to be removed (indicates AJAX request completed)
+        try {
+            await page.waitForSelector(config.SELECTORS.processingIndicator, { 
+                timeout: 30000,
+                state: 'detached'
+            });
+        } catch (error) {
+            // Fallback: wait for a longer time to handle slower responses
+            await page.waitForTimeout(5000);
+        }
+        
+        // Additional wait to ensure content is fully loaded
+        await page.waitForTimeout(config.CRAWLER.ajaxPaginationDelay || 4000);
+        
+        // Verify that page content has actually changed
+        const newPageContent = await page.evaluate(() => {
+            const links = document.querySelectorAll('.list-doctor .list-doctor__item a');
+            return Array.from(links).map(link => link.href).sort();
+        });
+        
+        // Check if content actually changed
+        const contentChanged = JSON.stringify(currentPageContent) !== JSON.stringify(newPageContent);
+        if (!contentChanged) {
+            return false;
+        }
+        
+        return true;
+        
+    } catch (error) {
+        return false;
+    }
+}
+
+/**
  * Check if next button exists and is not disabled
  * @param {Page} page - Playwright page object
  * @param {Object} config - Configuration object
@@ -14,22 +95,16 @@ export async function hasNextPage(page, config) {
     try {
         const nextButton = await page.$(config.SELECTORS.nextButton);
         if (!nextButton) {
-            console.log('No next button found on this page');
             return false;
         }
-        
-        console.log('Next button found on page');
         
         const isDisabled = await page.evaluate((selector) => {
             const nextBtn = document.querySelector(selector);
             return nextBtn ? nextBtn.classList.contains('disabled') : true;
         }, config.SELECTORS.nextButtonContainer);
         
-        console.log(`Next button disabled status: ${isDisabled}`);
-        
         return !isDisabled;
     } catch (error) {
-        console.error('Error checking next page:', error);
         return false;
     }
 }
@@ -97,7 +172,6 @@ export function getNextPageUrl(currentUrl, config) {
             throw new Error(`Unsupported pagination type: ${paginationConfig.type}`);
         }
         
-        console.log(`Current page: ${currentPage}, next page URL: ${nextPageUrl}`);
         return nextPageUrl;
     } catch (error) {
         console.error('Error generating next page URL:', error);
@@ -120,19 +194,13 @@ export async function handlePagination(page, currentUrl, enqueueLinks, config) {
         const nextPageUrl = getNextPageUrl(currentUrl, config);
         
         if (nextPageUrl && shouldCrawlUrl(nextPageUrl, config.SITE)) {
-            console.log(`Enqueuing next page: ${nextPageUrl}`);
-            
             await enqueueLinks({
                 urls: [nextPageUrl],
                 label: config.CRAWLER.labels.SPECIALISTS_LIST,
             });
             
             return true;
-        } else if (nextPageUrl) {
-            console.log(`Next page URL filtered out: ${nextPageUrl}`);
         }
-    } else {
-        console.log('Next button is disabled - reached last page');
     }
     
     return false;
@@ -187,19 +255,13 @@ export async function handleInitialPagination(page, enqueueLinks, config) {
         const nextPageUrl = getPageUrl(nextPageNumber, config);
         
         if (nextPageUrl && shouldCrawlUrl(nextPageUrl, config.SITE)) {
-            console.log(`Enqueuing page ${nextPageNumber}: ${nextPageUrl}`);
-            
             await enqueueLinks({
                 urls: [nextPageUrl],
                 label: config.CRAWLER.labels.SPECIALISTS_LIST,
             });
             
             return true;
-        } else if (nextPageUrl) {
-            console.log(`Page ${nextPageNumber} URL filtered out: ${nextPageUrl}`);
         }
-    } else {
-        console.log('Next button is disabled - no more pages to crawl');
     }
     
     return false;

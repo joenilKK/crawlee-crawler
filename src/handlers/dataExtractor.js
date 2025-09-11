@@ -10,16 +10,129 @@
  */
 export async function extractDoctorName(page, config) {
     try {
-        await page.waitForSelector(config.SELECTORS.doctorName, { timeout: config.CRAWLER.timeout });
+        // Wait for page to be fully loaded
+        await page.waitForLoadState('networkidle');
         
-        const doctorName = await page.evaluate((selector) => {
-            const nameElement = document.querySelector(selector);
-            return nameElement ? nameElement.textContent.trim() : 'Name not found';
-        }, config.SELECTORS.doctorName);
+        // Try multiple selectors for doctor name with more specific ones first
+        const selectors = [
+            config.SELECTORS.doctorName,
+            '.doctor-banner .doctor-profile h1',
+            '.doctor-profile h1',
+            '.doctor-banner h1',
+            '.doctor-name h1',
+            '.profile-header h1',
+            '.doctor-title',
+            'h1:not(.page-title):not(.site-title)',
+            'h1'
+        ];
         
-        return doctorName;
+        for (const selector of selectors) {
+            try {
+                await page.waitForSelector(selector, { timeout: 3000 });
+                
+                const doctorName = await page.evaluate((sel) => {
+                    const nameElements = document.querySelectorAll(sel);
+                    
+                    // Try each element that matches the selector
+                    for (let nameElement of nameElements) {
+                        if (nameElement) {
+                            let text = nameElement.textContent.trim();
+                            
+                            // Skip if the text is too short or obviously not a name
+                            if (text.length < 3) continue;
+                            
+                            // Clean up common issues with concatenated text
+                            text = text.replace(/Specialty.*$/i, '').trim();
+                            text = text.replace(/Language\(s\) spoken.*$/i, '').trim();
+                            text = text.replace(/View Profile.*$/i, '').trim();
+                            
+                            // Additional cleanup for edge cases
+                            text = text.replace(/^View Profile\s*/i, '').trim();
+                            text = text.replace(/\s*View Profile$/i, '').trim();
+                            
+                            // Remove common unwanted phrases
+                            text = text.replace(/^(Dr\.\s+)?Profile\s*/i, '').trim();
+                            text = text.replace(/\s*Profile$/i, '').trim();
+                            text = text.replace(/^(Click to )?View\s*/i, '').trim();
+                            
+                            // Check if this looks like a doctor name (starts with Dr. or contains common name patterns)
+                            if (text && 
+                                (text.match(/^Dr\.?\s+[A-Z]/i) || // Starts with Dr.
+                                 text.match(/^[A-Z][a-z]+\s+[A-Z]/i) || // First Last name pattern
+                                 text.match(/^Prof\.?\s+/i) || // Professor
+                                 text.match(/^A\/Prof\.?\s+/i))) { // Associate Professor
+                                return text;
+                            }
+                            
+                            // If no specific doctor title, but looks like a proper name, return it
+                            if (text && 
+                                text.length > 5 && 
+                                text.match(/^[A-Z][a-z]+(\s+[A-Z][a-z]*)*$/i) && // Proper name format
+                                !text.toLowerCase().includes('view') &&
+                                !text.toLowerCase().includes('profile') &&
+                                !text.toLowerCase().includes('click') &&
+                                !text.toLowerCase().includes('page') &&
+                                !text.toLowerCase().includes('home')) {
+                                return text;
+                            }
+                        }
+                    }
+                    return null;
+                }, selector);
+                
+                if (doctorName && 
+                    doctorName !== 'View Profile' && 
+                    doctorName.toLowerCase() !== 'view profile' && 
+                    doctorName.length > 2 && 
+                    !doctorName.toLowerCase().includes('view profile')) {
+                    return doctorName;
+                }
+            } catch (selectorError) {
+                // Try next selector
+                continue;
+            }
+        }
+        
+        // Final attempt: Try to find doctor name in page title or meta tags
+        const titleBasedName = await page.evaluate(() => {
+            const title = document.title;
+            
+            // Look for doctor name in title
+            const titleMatch = title.match(/Dr\.?\s+[A-Z][a-z]+(\s+[A-Z][a-z]*)*|Prof\.?\s+[A-Z][a-z]+(\s+[A-Z][a-z]*)*|A\/Prof\.?\s+[A-Z][a-z]+(\s+[A-Z][a-z]*)*|[A-Z][a-z]+\s+[A-Z][a-z]+/i);
+            if (titleMatch && titleMatch[0] && 
+                !titleMatch[0].toLowerCase().includes('view') &&
+                !titleMatch[0].toLowerCase().includes('profile') &&
+                titleMatch[0].length > 5) {
+                return titleMatch[0].trim();
+            }
+            
+            return null;
+        });
+        
+        if (titleBasedName) {
+            return titleBasedName;
+        }
+        
+        // Debug: Log page content to understand the structure
+        const pageDebugInfo = await page.evaluate(() => {
+            return {
+                title: document.title,
+                url: window.location.href,
+                h1Elements: Array.from(document.querySelectorAll('h1')).map(h1 => ({
+                    text: h1.textContent.trim(),
+                    className: h1.className,
+                    id: h1.id
+                })),
+                doctorProfileElements: Array.from(document.querySelectorAll('.doctor-profile, .profile, .doctor-details, .doctor-banner')).map(el => ({
+                    className: el.className,
+                    text: el.textContent.substring(0, 200).trim()
+                })),
+                allText: document.body.textContent.substring(0, 500).trim()
+            };
+        });
+        
+        return 'Name not found';
     } catch (error) {
-        console.error('Error extracting doctor name:', error);
         return 'Name extraction failed';
     }
 }
@@ -55,7 +168,6 @@ export async function extractTableData(page, config) {
         
         return tableData;
     } catch (error) {
-        console.error('Error extracting table data:', error);
         return [];
     }
 }
@@ -84,7 +196,6 @@ export async function extractSpecialty(page, config) {
         
         return specialty;
     } catch (error) {
-        console.error('Error extracting specialty:', error);
         return '';
     }
 }
@@ -97,27 +208,84 @@ export async function extractSpecialty(page, config) {
  */
 export async function extractContactDetails(page, config) {
     try {
-        const contactDetails = await page.evaluate((selector) => {
-            const contactElements = document.querySelectorAll(selector);
-            const contacts = [];
-            
-            contactElements.forEach(element => {
-                const text = element.textContent.trim();
-                const href = element.href || '';
-                if (text) {
-                    contacts.push({
-                        text: text,
-                        link: href
+        // Try multiple selectors for contact details
+        const contactSelectors = [
+            config.SELECTORS.contactLinks,
+            '.clinic-item a',
+            '.contact-info a',
+            '.doctor-contact a',
+            '.clinic-contacts a',
+            'a[href*="tel:"]',
+            'a[href*="mailto:"]'
+        ];
+        
+        for (const selector of contactSelectors) {
+            try {
+                const contactDetails = await page.evaluate((sel) => {
+                    const contactElements = document.querySelectorAll(sel);
+                    const contacts = [];
+                    
+                    contactElements.forEach(element => {
+                        const text = element.textContent.trim();
+                        const href = element.href || '';
+                        if (text && (href.includes('tel:') || href.includes('mailto:') || href.includes('http'))) {
+                            contacts.push({
+                                text: text,
+                                link: href
+                            });
+                        }
                     });
+                    
+                    return contacts;
+                }, selector);
+                
+                if (contactDetails && contactDetails.length > 0) {
+                    return contactDetails;
                 }
-            });
+            } catch (selectorError) {
+                // Try next selector
+                continue;
+            }
+        }
+        
+        // If no contacts found with any selector, try to find phone numbers and emails in text
+        const textBasedContacts = await page.evaluate(() => {
+            const contacts = [];
+            const bodyText = document.body.textContent;
+            
+            // Find phone numbers
+            const phoneRegex = /(\+65\s?)?[689]\d{3}\s?\d{4}/g;
+            const phones = bodyText.match(phoneRegex);
+            if (phones) {
+                phones.forEach(phone => {
+                    contacts.push({
+                        text: phone.trim(),
+                        link: `tel:${phone.replace(/\s/g, '')}`
+                    });
+                });
+            }
+            
+            // Find email addresses
+            const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+            const emails = bodyText.match(emailRegex);
+            if (emails) {
+                emails.forEach(email => {
+                    contacts.push({
+                        text: email.trim(),
+                        link: `mailto:${email.trim()}`
+                    });
+                });
+            }
             
             return contacts;
-        }, config.SELECTORS.contactLinks);
+        });
         
-        return contactDetails;
+        if (textBasedContacts.length > 0) {
+            return textBasedContacts;
+        }
+        
+        return [];
     } catch (error) {
-        console.error('Error extracting contact details:', error);
         return [];
     }
 }
@@ -199,37 +367,85 @@ export async function extractWithFallback(page, selector, dataType = 'text', att
  * @returns {Promise<Object>} Specialist data object
  */
 export async function extractSpecialistData(page, url, config) {
-    console.log(`Extracting data from specialist page: ${url}`);
-    
     try {
+        // Check if page is still open before proceeding
+        if (page.isClosed()) {
+            return null;
+        }
+        
+        // Wait for page to be fully loaded with timeout
+        await page.waitForLoadState('networkidle', { timeout: 30000 });
+        
+        // Check if this is a valid doctor detail page
+        const pageValidation = await page.evaluate(() => {
+            const title = document.title.toLowerCase();
+            const bodyText = document.body.textContent.toLowerCase();
+            const pageLength = document.body.textContent.trim().length;
+            
+            return {
+                hasError: title.includes('error') || title.includes('404') || 
+                         bodyText.includes('page not found') || bodyText.includes('error'),
+                hasContent: pageLength > 100,
+                title: document.title,
+                bodyPreview: document.body.textContent.substring(0, 300).trim(),
+                hasDoctor: bodyText.includes('dr.') || bodyText.includes('doctor') || 
+                          bodyText.includes('specialist') || bodyText.includes('physician') ||
+                          bodyText.includes('prof.') || bodyText.includes('professor'),
+                url: window.location.href
+            };
+        });
+        
+        if (pageValidation.hasError || !pageValidation.hasContent) {
+            return null; // Return null for invalid pages so they can be filtered out
+        }
+        
+         // If the page doesn't seem to contain doctor information, still try to extract
+         // as it might be a valid doctor page without obvious keywords
+        
         const doctorName = await extractDoctorName(page, config);
         const specialty = await extractSpecialty(page, config);
         const contact = await extractContactDetails(page, config);
         const doctorinfo = await extractTableData(page, config);
         
+        // Enhanced validation for data quality
+        const isValidDoctorName = doctorName && 
+                                 doctorName !== 'Name not found' && 
+                                 doctorName !== 'View Profile' && 
+                                 doctorName !== 'Name extraction failed' &&
+                                 doctorName !== 'Invalid page' &&
+                                 doctorName.length > 2 &&
+                                 !doctorName.toLowerCase().includes('view profile') &&
+                                 !doctorName.toLowerCase().includes('click') &&
+                                 !doctorName.toLowerCase().includes('profile');
+        
+         // Check if we have other meaningful data even if doctor name is questionable
+        
+        // Additional validation: check if we have at least some meaningful data
+        const hasMeaningfulData = (doctorName && doctorName !== 'Name not found' && doctorName !== 'Name extraction failed') || 
+                                 (specialty && specialty.length > 0) || 
+                                 (contact && contact.length > 0);
+        
+        if (!hasMeaningfulData) {
+            return null;
+        }
+        
+        // If we have a questionable doctor name but other data, still include it
+        // Keep the extracted name even if questionable, since we have other valid data
+        
         const specialistData = {
+            extractedDate: new Date().toISOString().split('T')[0], // Match the format in your JSON
             url: url,
             doctorname: doctorName,
             specialty: specialty,
             contact: contact,
-            businessOverview: doctorinfo,
-            extractedAt: new Date().toISOString()
+            businessOverview: doctorinfo
         };
-        console.log(`Extracted data for: ${doctorName}`);
+        
         return specialistData;
         
     } catch (error) {
-        console.error(`Error extracting data from ${url}:`, error);
-        
-        return {
-            url: url,
-            doctorname: 'Extraction failed',
-            specialty: '',
-            contact: [],
-            businessOverview: [],
-            error: error.message,
-            extractedAt: new Date().toISOString()
-        };
+        // Return null for failed extractions instead of bad data
+        return null;
     }
 }
 
