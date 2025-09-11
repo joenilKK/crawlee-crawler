@@ -59,11 +59,11 @@ export async function getConfiguration() {
                 scraperMode: true,
                 scraperUrls: ['https://mtalvernia.sg/doctors/'],
                 customSelectors: {
-                    doctorCards: '.doctor-card, .doctor-item, .profile-card, .specialist-card, .card',
-                    doctorName: 'h4.doctor-name',
-                    position: '.wrap.top_wrap .right > p',
+                    doctorCards: '.doctor',
+                    doctorName: 'h4.doctor-name, .left h4',
+                    position: '.right > p',
                     phoneLinks: '.tel_number a',
-                    Website: '.wrap .right p a'
+                    Website: '.right p a'
                 }
             };
           //  console.log('✅ Default scraper mode configuration applied');
