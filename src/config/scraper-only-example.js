@@ -45,6 +45,7 @@ export const LOCAL_CONFIG = {
         // Contact information selectors
         phoneLinks: '.mp-pac .mp-pac-box a.moe-vp-pac, .tel_number a, a[href^="tel:"], .phone a, .contact a',
         emailLinks: 'a[href^="mailto:"], .email a',
+        Website: '.wrap .right p a, .website a, a[href*="http"]',
         
         // Additional information selectors
         education: '.education, .qualifications, .credentials',

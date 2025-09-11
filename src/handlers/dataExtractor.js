@@ -190,7 +190,7 @@ export async function extractCustomData(page, url, customSelectors = {}) {
                 // Determine data type based on field name
                 if (fieldName.toLowerCase().includes('image') || fieldName.toLowerCase().includes('img')) {
                     dataType = 'image';
-                } else if (fieldName.toLowerCase().includes('link') || fieldName.toLowerCase().includes('url')) {
+                } else if (fieldName.toLowerCase().includes('link') || fieldName.toLowerCase().includes('url') || fieldName.toLowerCase().includes('website')) {
                     dataType = 'link';
                 }
                 

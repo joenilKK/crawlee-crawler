@@ -33,6 +33,7 @@ export const SCRAPER_EXAMPLE_CONFIG = {
         // Contact information (common patterns)
         email: 'a[href^="mailto:"], .email, .contact-email',
         phone: 'a[href^="tel:"], .phone, .contact-phone',
+        Website: '.website a, a[href*="http"], .url',
         
         // Social media
         social: 'a[href*="facebook.com"], a[href*="twitter.com"], a[href*="linkedin.com"], a[href*="instagram.com"]',

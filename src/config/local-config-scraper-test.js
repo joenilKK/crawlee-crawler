@@ -31,6 +31,7 @@ export const LOCAL_CONFIG_OVERRIDE = {
         // Contact information
         email: 'a[href^="mailto:"], .email',
         phone: 'a[href^="tel:"], .phone',
+        Website: '.website a, a[href*="http"], .url',
         
         // Content areas
         content: '.content, main, article, .main-content',
