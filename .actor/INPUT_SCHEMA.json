@@ -1,63 +1,9 @@
 { 
     "title": "Farrer Park Hospital Crawler",
-    "description": "Web crawler for extracting specialist doctor information from Farrer Park Hospital website. Crawls all pages with optional cookie support for authenticated scraping.",
+    "description": "Web crawler for extracting specialist doctor information from Farrer Park Hospital website. Crawls all pages automatically.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
-        "cookies": {
-            "title": "🍪 Cookies (Optional)",
-            "type": "array",
-            "description": "Optional array of cookies for authenticated scraping. Each cookie should be in browser extension format with fields: name, value, domain, path, secure, httpOnly, sameSite, expirationDate.",
-            "editor": "json",
-            "prefill": [],
-            "items": {
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "title": "Cookie Name",
-                        "description": "The name of the cookie"
-                    },
-                    "value": {
-                        "type": "string",
-                        "title": "Cookie Value",
-                        "description": "The value of the cookie"
-                    },
-                    "domain": {
-                        "type": "string",
-                        "title": "Domain",
-                        "description": "The domain for which the cookie is valid"
-                    },
-                    "path": {
-                        "type": "string",
-                        "title": "Path",
-                        "description": "The path for which the cookie is valid"
-                    },
-                    "secure": {
-                        "type": "boolean",
-                        "title": "Secure",
-                        "description": "Whether the cookie should only be sent over HTTPS"
-                    },
-                    "httpOnly": {
-                        "type": "boolean",
-                        "title": "HTTP Only",
-                        "description": "Whether the cookie should only be accessible via HTTP(S) and not JavaScript"
-                    },
-                    "sameSite": {
-                        "type": "string",
-                        "title": "Same Site",
-                        "description": "The SameSite attribute of the cookie",
-                        "enum": ["no_restriction", "lax", "strict"]
-                    },
-                    "expirationDate": {
-                        "type": "number",
-                        "title": "Expiration Date (Unix timestamp)",
-                        "description": "The expiration date of the cookie as Unix timestamp"
-                    }
-                },
-                "required": ["name", "value", "domain"]
-            }
-        },
         "headless": {
             "title": "🖥️ Headless Mode",
             "type": "boolean",
