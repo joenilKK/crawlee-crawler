@@ -52,13 +52,7 @@ function convertCookiesToPlaywrightFormat(cookies) {
 // Get configuration based on environment (Apify or local)
 const { input, isApify, Actor } = await getConfiguration();
 
-// Validate required input field
-if (input.maxRequestsPerCrawl === undefined || input.maxRequestsPerCrawl === null || 
-    (input.maxRequestsPerCrawl !== -1 && input.maxRequestsPerCrawl < 1)) {
-    const errorMessage = `❌ CONFIGURATION ERROR: maxRequestsPerCrawl is required and must be a positive integer or -1 for unlimited crawling.`;
-    console.error(errorMessage);
-    throw new Error(errorMessage);
-}
+// No validation needed - crawler runs unlimited by default
 
 // Import local configuration for hardcoded values
 const { LOCAL_CONFIG } = await import('./config/local-config.js');
@@ -90,7 +84,6 @@ const CONFIG = {
         tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr'
     },
     CRAWLER: {
-        maxRequestsPerCrawl: input.maxRequestsPerCrawl,
         headless: input.headless !== undefined ? input.headless : LOCAL_CONFIG.headless,
         timeout: LOCAL_CONFIG.timeout,
         delayBetweenLinks: LOCAL_CONFIG.delayBetweenLinks || 2000,
@@ -232,11 +225,6 @@ const crawler = new PlaywrightCrawler({
                     
                      // Process each doctor on this page immediately
                      for (let i = 0; i < doctorLinks.length; i++) {
-                         // Check if we've reached the maximum number of SUCCESSFULLY EXTRACTED doctors
-                         if (CONFIG.CRAWLER.maxRequestsPerCrawl !== -1 && totalDoctorsProcessed >= CONFIG.CRAWLER.maxRequestsPerCrawl) {
-                             hasMorePages = false;
-                             break;
-                         }
                         
                         const doctor = doctorLinks[i];
                         
@@ -302,10 +290,7 @@ const crawler = new PlaywrightCrawler({
                     }
                     
                      // After processing all doctors on current page, check if we should continue to next page
-                     // Don't continue if we've reached the maximum limit of successfully extracted doctors
-                     if (CONFIG.CRAWLER.maxRequestsPerCrawl !== -1 && totalDoctorsProcessed >= CONFIG.CRAWLER.maxRequestsPerCrawl) {
-                         hasMorePages = false;
-                    } else if (CONFIG.SITE.pagination.type === 'ajax') {
+                     if (CONFIG.SITE.pagination.type === 'ajax') {
                         hasMorePages = await handleAjaxPagination(page, CONFIG);
                         
                         if (hasMorePages) {
@@ -333,7 +318,7 @@ const crawler = new PlaywrightCrawler({
             console.log("Done Extracting");
         }
     },
-    maxRequestsPerCrawl: CONFIG.CRAWLER.maxRequestsPerCrawl === -1 ? undefined : CONFIG.CRAWLER.maxRequestsPerCrawl,
+    // No maxRequestsPerCrawl - unlimited crawling
     headless: CONFIG.CRAWLER.headless,
 });
 
