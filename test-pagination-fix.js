@@ -30,7 +30,7 @@ const TEST_CONFIG = {
         contactLinks: LOCAL_CONFIG.contactLinksSelector
     },
     CRAWLER: {
-        maxRequestsPerCrawl: 3, // Just test a few pages
+        maxRequestsPerCrawl: 3, // Just test a few pages, use -1 for unlimited crawling
         headless: false, // Keep visible for debugging
         timeout: LOCAL_CONFIG.timeout,
         labels: {

@@ -4,12 +4,10 @@ A flexible web crawler that works both locally and as an Apify Actor. Designed f
 
 ## Features
 
-- 🏥 **Dual Mode Operation**: Switch between crawling mode and scraper-only mode
-- 🎯 **Scraper-Only Mode**: Scrape specific URLs with custom selectors for targeted data extraction
+- 🏥 **Medical Site Optimization**: Specialized extractors for medical/doctor websites
 - 🍪 **Cookie Support**: Import cookies from browser extensions for authenticated scraping
 - 🔄 **Flexible Pagination**: Support for both query-based (?page=2) and path-based (/page/2/) pagination
 - ⚙️ **Fully Configurable**: Custom selectors, URL patterns, and extraction rules
-- 📊 **Medical Site Optimization**: Specialized extractors for medical/doctor websites
 - 💾 **Multiple Output Formats**: Save data in JSON format and Apify dataset
 - 🐳 **Docker Containerized**: Ready for Apify platform deployment
 - 🎛️ **Web UI Configuration**: Easy setup through Apify Console
@@ -20,62 +18,29 @@ A flexible web crawler that works both locally and as an Apify Actor. Designed f
 
 ## Configuration
 
-The actor accepts the following input parameters through the Apify platform:
+### Apify Actor Input
 
-### Site Settings
-- **Site Name**: Name of the medical center
-- **Base URL**: Base URL of the website
-- **Start URL**: URL to start crawling from
-- **Allowed URL Patterns**: URL patterns that are allowed to be crawled
-- **Excluded URL Patterns**: URL patterns to exclude from crawling
+The actor accepts a single input parameter through the Apify platform:
 
-### Pagination Settings
-- **Pagination Type**: Choose between query parameters (`?page=2`) or path-based (`/page/2/`)
-- **Query Pattern**: Pattern for query-based pagination (use `{page}` as placeholder)
-- **Path Pattern**: Pattern for path-based pagination (use `{page}` as placeholder)
-- **Pagination Base URL**: Base URL for pagination (optional)
-- **Start Page Number**: Page number to start pagination from
+- **Max Requests Per Crawl**: Maximum number of requests to process (required)
 
-### Selectors
-- **Specialist Links Selector**: CSS selector for specialist profile links
-- **Next Button Selector**: CSS selector for the next page button
-- **Next Button Container Selector**: CSS selector for the next button container
-- **Doctor Name Selector**: CSS selector for doctor name on detail pages
-- **Contact Links Selector**: CSS selector for contact links on detail pages
+### Local Configuration
 
-### Crawler Settings
-- **Max Requests Per Crawl**: Maximum number of requests to process
-- **Headless Mode**: Run browser in headless mode
-- **Timeout**: Timeout for page operations in milliseconds
-- **Output Filename**: Custom filename for the output (optional)
-- **Scraper-Only Mode**: Enable scraper-only mode to scrape specific URLs instead of crawling
+All other settings (site configuration, selectors, pagination, etc.) are configured in the `src/config/local-config.js` file:
 
-### Scraper-Only Mode Settings
-- **URLs to Scrape**: List of specific URLs to scrape (required when Scraper-Only Mode is enabled)
-- **Custom Selectors**: Custom CSS selectors for data extraction in scraper-only mode
-  - `doctorName`: CSS selector for doctor names
-  - `position`: CSS selector for positions/specialties
-  - `phoneLinks`: CSS selector for phone number links
-  - `doctorCards`: CSS selector for doctor card containers
-  - Add any custom fields you need for your specific use case
+- **Site Settings**: Site name, base URL, start URL, allowed/excluded URL patterns
+- **Pagination Settings**: Pagination type, query/path patterns, base URL, start page
+- **Selectors**: CSS selectors for specialist links, buttons, doctor names, contact links
+- **Crawler Settings**: Headless mode, timeout, output filename
+- **Cookie Support**: Cookies for authenticated scraping
+- **User Agent**: Custom user agent string
 
 ### 🍪 Cookie Support
 
-The crawler supports importing cookies from browser extensions for authenticated scraping. This is useful for:
-- Scraping protected/authenticated pages
-- Maintaining login sessions
-- Bypassing cookie-based access controls
+The crawler supports importing cookies from browser extensions for authenticated scraping. Configure cookies in `src/config/local-config.js`:
 
-#### How to Use Cookies in Apify:
-
-1. **Export cookies from your browser extension** (EditThisCookie, Cookie-Editor, etc.)
-2. **Copy the JSON array** of cookies
-3. **Paste into the "Cookies" field** in the Actor input configuration
-4. **Run the Actor** - cookies will be automatically applied to all requests
-
-#### Cookie Format:
-```json
-[
+```javascript
+cookies: [
   {
     "name": "session_id",
     "value": "abc123xyz",
@@ -101,11 +66,6 @@ The crawler supports importing cookies from browser extensions for authenticated
 - `sameSite`: SameSite policy ('lax', 'strict', 'no_restriction')
 - `expirationDate`: Unix timestamp for expiration
 
-The crawler automatically converts browser extension cookie format to Playwright format and applies them before each page navigation.
-
-### Additional Settings
-- **Custom User Agent**: Custom user agent string to use for requests
-
 ## Local Development
 
 ### Prerequisites
@@ -124,7 +84,12 @@ The crawler automatically detects whether it's running locally or in Apify envir
 1. Edit `src/config/local-config.js` to configure your target website
 2. Adjust selectors, URLs, and crawler settings as needed
 3. Set `headless: false` for debugging (see browser actions)
-4. Set `maxRequestsPerCrawl` to a lower number for testing
+4. Set `maxRequestsPerCrawl` to a lower number for testing, or -1 for unlimited crawling
+
+#### For Apify Deployment:
+1. All site configuration is taken from `src/config/local-config.js`
+2. Only `maxRequestsPerCrawl` can be configured through the Apify input schema
+3. This allows for consistent site configuration while allowing request limits to be adjusted per run
 
 #### Optional: Create Override File
 Create `src/config/local-config-override.js` to override specific settings without modifying the main config:
@@ -133,8 +98,9 @@ Create `src/config/local-config-override.js` to override specific settings witho
 export const LOCAL_CONFIG_OVERRIDE = {
     startUrl: 'https://your-custom-site.com/specialists/',
     headless: false,
-    maxRequestsPerCrawl: 10,
+    maxRequestsPerCrawl: 10, // Use -1 for unlimited crawling
     // ... any other settings you want to override
+    // Note: When running through Apify, only maxRequestsPerCrawl can be overridden
 };
 ```
 
@@ -156,35 +122,6 @@ The crawler will:
 3. Follow pagination to discover all pages
 4. Visit each specialist profile and extract data
 5. Save results to a JSON file in the project root
-
-#### Scraper-Only Mode
-To use scraper-only mode locally:
-
-1. Edit `src/config/local-config.js` and set:
-```javascript
-scraperMode: true,
-scraperUrls: [
-    'https://example.com/doctor/john-smith',
-    'https://example.com/doctor/jane-doe'
-],
-customSelectors: {
-    doctorName: '.doctor-name, h3',
-    position: '.specialty, .position',
-    phoneLinks: 'a[href^="tel:"]',
-    // Add more selectors as needed
-}
-```
-
-2. Run the scraper:
-```bash
-npm start
-```
-
-The scraper will:
-1. Visit each URL in the scraperUrls array
-2. Extract data using the custom selectors
-3. Detect medical sites automatically for specialized extraction
-4. Save results to a JSON file
 
 ### Testing Different Configurations
 You can test different sites by modifying the local configuration file or creating override files for different scenarios.
@@ -274,13 +211,13 @@ Modify `src/handlers/dataExtractor.js` to extract additional fields from special
 1. **Selectors not found**: Check if the website structure has changed
 2. **Pagination not working**: Verify pagination configuration matches the website
 3. **Timeout errors**: Increase the timeout value in configuration
-4. **Memory issues**: Reduce `maxRequestsPerCrawl` for large websites
+4. **Memory issues**: Reduce `maxRequestsPerCrawl` for large websites (or use -1 for unlimited crawling if memory allows)
 
 ### Debugging
 
 #### Local Development
 - Set `headless: false` in `src/config/local-config.js` to see the browser in action
-- Reduce `maxRequestsPerCrawl` to test with fewer pages
+- Reduce `maxRequestsPerCrawl` to test with fewer pages (or use -1 for unlimited crawling)
 - Check console logs for detailed error messages
 - Use browser dev tools to verify selectors
 

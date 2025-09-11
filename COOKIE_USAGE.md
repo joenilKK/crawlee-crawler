@@ -122,11 +122,6 @@ export const LOCAL_CONFIG_OVERRIDE = {
     baseUrl: 'https://protected-site.com/',
     startUrl: 'https://protected-site.com/dashboard',
     
-    scraperMode: true,
-    scraperUrls: [
-        'https://protected-site.com/dashboard',
-        'https://protected-site.com/profile'
-    ],
     
     cookies: [
         {

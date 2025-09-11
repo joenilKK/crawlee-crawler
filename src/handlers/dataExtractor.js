@@ -25,7 +25,43 @@ export async function extractDoctorName(page, config) {
 }
 
 /**
- * Extract contact details from specialist page
+ * Extract table data as key-value pairs from table rows
+ * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
+ * @returns {Promise<Array>} Array of table row data
+ */
+export async function extractTableData(page, config) {
+    try {
+        const tableData = await page.evaluate((selector) => {
+            const tableRows = document.querySelectorAll(selector);
+            const businessOverview = [];
+            
+            tableRows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 2) {
+                    const key = cells[0].textContent.trim();
+                    const value = cells[1].textContent.trim();
+                    if (key && value) {
+                        businessOverview.push({
+                            key: key,
+                            value: value
+                        });
+                    }
+                }
+            });
+            
+            return businessOverview;
+        }, config.SELECTORS.tableRows);
+        
+        return tableData;
+    } catch (error) {
+        console.error('Error extracting table data:', error);
+        return [];
+    }
+}
+
+/**
+ * Extract contact details from specialist page (legacy function for compatibility)
  * @param {Page} page - Playwright page object
  * @param {Object} config - Configuration object
  * @returns {Promise<Array>} Array of contact details
@@ -137,18 +173,18 @@ export async function extractSpecialistData(page, url, config) {
     console.log(`Extracting data from specialist page: ${url}`);
     
     try {
-        const doctorName = await extractDoctorName(page, config);
-        const contactDetails = await extractContactDetails(page, config);
+        const companyName = await extractDoctorName(page, config);
+        const businessOverview = await extractTableData(page, config);
         
         const specialistData = {
             url: url,
-            doctorName: doctorName,
-            contactDetails: contactDetails,
+            companyName: companyName,
+            businessOverview: businessOverview,
             extractedAt: new Date().toISOString()
         };
         
-        console.log(`Extracted data for: ${doctorName}`);
-        console.log(`Contact details found: ${contactDetails.length}`);
+        console.log(`Extracted data for: ${companyName}`);
+        console.log(`Business overview entries found: ${businessOverview.length}`);
         
         return specialistData;
         
@@ -157,120 +193,11 @@ export async function extractSpecialistData(page, url, config) {
         
         return {
             url: url,
-            doctorName: 'Extraction failed',
-            contactDetails: [],
+            companyName: 'Extraction failed',
+            businessOverview: [],
             error: error.message,
             extractedAt: new Date().toISOString()
         };
     }
 }
 
-/**
- * Extract data using custom selectors (for scraper-only mode)
- * @param {Page} page - Playwright page object
- * @param {string} url - Current page URL
- * @param {Object} customSelectors - Object with custom selector definitions
- * @returns {Promise<Object>} Extracted data object
- */
-export async function extractCustomData(page, url, customSelectors = {}) {
-    console.log(`Extracting custom data from: ${url}`);
-    
-    const extractedData = {
-        url: url,
-        title: await page.title(),
-        extractedAt: new Date().toISOString(),
-        data: {}
-    };
-    
-    try {
-        for (const [fieldName, selectorConfig] of Object.entries(customSelectors)) {
-            try {
-                // Handle nested structure for links
-                if (Array.isArray(selectorConfig)) {
-                    console.log(`🔗 Processing nested selectors for ${fieldName}`);
-                    const nestedResults = [];
-                    
-                    for (const linkConfig of selectorConfig) {
-                        if (typeof linkConfig === 'object' && linkConfig !== null) {
-                            const linkData = {};
-                            
-                            for (const [linkName, linkSelector] of Object.entries(linkConfig)) {
-                                try {
-                                    let dataType = 'link'; // Default to link for nested structures
-                                    
-                                    // Override data type based on field name
-                                    if (linkName.toLowerCase().includes('image') || linkName.toLowerCase().includes('img')) {
-                                        dataType = 'image';
-                                    } else if (linkName.toLowerCase().includes('text') || linkName.toLowerCase().includes('title')) {
-                                        dataType = 'text';
-                                    }
-                                    
-                                    const result = await extractWithFallback(page, linkSelector, dataType);
-                                    linkData[linkName] = result;
-                                    
-                                    console.log(`  ✅ Extracted ${linkName}: ${Array.isArray(result) ? result.length + ' items' : 'data found'}`);
-                                } catch (error) {
-                                    console.log(`  ❌ Error extracting ${linkName}:`, error.message);
-                                    linkData[linkName] = null;
-                                }
-                            }
-                            
-                            nestedResults.push(linkData);
-                        }
-                    }
-                    
-                    extractedData.data[fieldName] = nestedResults;
-                } else if (typeof selectorConfig === 'string') {
-                    // Handle simple string selectors (existing functionality)
-                    let dataType = 'text';
-                    
-                    // Determine data type based on field name
-                    if (fieldName.toLowerCase().includes('image') || fieldName.toLowerCase().includes('img')) {
-                        dataType = 'image';
-                    } else if (fieldName.toLowerCase().includes('link') || fieldName.toLowerCase().includes('url')) {
-                        dataType = 'link';
-                    }
-                    
-                    const result = await extractWithFallback(page, selectorConfig, dataType);
-                    
-                    if (result !== null) {
-                        extractedData.data[fieldName] = result;
-                        console.log(`✅ Extracted ${fieldName}: ${Array.isArray(result) ? result.length + ' items' : 'data found'}`);
-                    } else {
-                        console.log(`⚠️ No data found for ${fieldName} with selector: ${selectorConfig}`);
-                        extractedData.data[fieldName] = null;
-                    }
-                } else {
-                    console.log(`⚠️ Unsupported selector configuration for ${fieldName}`);
-                    extractedData.data[fieldName] = null;
-                }
-                
-            } catch (error) {
-                console.log(`❌ Error extracting ${fieldName}:`, error.message);
-                extractedData.data[fieldName] = null;
-            }
-        }
-        
-        // Extract page metadata
-        extractedData.meta = await page.evaluate(() => {
-            const meta = {};
-            const metaTags = document.querySelectorAll('meta');
-            metaTags.forEach(tag => {
-                const name = tag.getAttribute('name') || tag.getAttribute('property') || tag.getAttribute('http-equiv');
-                const content = tag.getAttribute('content');
-                if (name && content) {
-                    meta[name] = content;
-                }
-            });
-            return meta;
-        });
-        
-        console.log(`✅ Successfully extracted custom data from: ${url}`);
-        return extractedData;
-        
-    } catch (error) {
-        console.error(`❌ Error extracting custom data from ${url}:`, error);
-        extractedData.error = error.message;
-        return extractedData;
-    }
-}

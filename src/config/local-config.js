@@ -5,53 +5,38 @@
 
 export const LOCAL_CONFIG = {
     // Site configuration - modify these for your target site
-    siteName: 'MT Alvernia',
-    baseUrl: 'https://www.mountelizabeth.com.sg/',
-    startUrl: 'https://www.mountelizabeth.com.sg/',
+    siteName: 'OPENGOVSG',
+    baseUrl: 'https://opengovsg.com/',
+    startUrl: 'https://opengovsg.com/corporate?ssic=86201',
     allowedUrlPatterns: [
-      'https://www.mountelizabeth.com.sg/',
-      'https://www.mountelizabeth.com.sg/*'
+      'https://opengovsg.com/corporate/',
+      'https://opengovsg.com/corporate/*',
+      'https://opengovsg.com/corporate?*'
     ],
     excludedUrlPatterns: [
-      'https://www.mountelizabeth.com.sg/about/',
+      'https://opengovsg.com/corporate/about/',
     ],
     
     // Pagination settings
-    paginationType: 'path', // 'query' or 'path'
-    queryPattern: '', // for query pagination
-    pathPattern: '/page/{page}/', // for path pagination
+    paginationType: 'query', // 'query' or 'path'
+    queryPattern: 'page={page}', // for query pagination
+    pathPattern: '', // for path pagination
     paginationBaseUrl: null, // uses startUrl if null
     startPage: 1,
     
     // Selectors
-    specialistLinksSelector: '.specialist-list a.thumbnail',
-    nextButtonSelector: '.pagination .pagination-next a',
-    nextButtonContainerSelector: '.pagination',
-    doctorNameSelector: '.desktop > h1',
-    contactLinksSelector: '.left-sidebar ul li a',
+    specialistLinksSelector: '.panel-card .panel-body table td a',
+    nextButtonSelector: '.panel-footer ul.pager li a',
+    nextButtonContainerSelector: '.panel-footer ul.pager',
+    doctorNameSelector: '.panel-heading > h1',
+    contactLinksSelector: '.panel-body tbody tr td',
+    tableRowsSelector: '.panel-body tbody tr',
     
     // Crawler settings
-    maxRequestsPerCrawl: 50, // Lower for local testing
+    maxRequestsPerCrawl: 5, // Lower for local testing, use -1 for unlimited crawling
     headless: false, // Set to false for local debugging
     timeout: 10000, // Request timeout in milliseconds
     
-    // Scraper-only mode settings
-    scraperMode: false, // Set to true to enable scraper-only mode (no crawling/pagination)
-    scraperUrls: [
-        // Add specific URLs to scrape (when scraperMode is true)
-        // 'https://example.com/page1',
-        // 'https://mtalvernia.sg/doctors/'
-    ],
-    
-    // Custom data extraction selectors (for scraper mode)
-    customSelectors: {
-        // Define selectors for doctor cards/containers
-        doctorCards: '.doctor-card, .doctor-item, .profile-card, .specialist-card, .card',
-        doctorName: '.doctor-name, .name, h3, h4, .title',
-        position: '.specialty, .position, .department, p, .description',
-        phoneLinks: '.tel_number a, a[href^="tel:"], .phone a, .contact a',
-        // You can add more custom selectors as needed
-    },
     
     // Output settings
     outputFilename: 'mtalvernia-scraped-data', // Custom filename (will add .json automatically)

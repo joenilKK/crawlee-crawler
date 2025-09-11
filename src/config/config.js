@@ -52,7 +52,7 @@ export const CONFIG = {
 
     // Crawler settings
     CRAWLER: {
-        maxRequestsPerCrawl: 200,
+        maxRequestsPerCrawl: 200, // Use -1 for unlimited crawling
         headless: true, // Set to true for production
         timeout: 10000,
         labels: {

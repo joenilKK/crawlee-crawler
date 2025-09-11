@@ -34,32 +34,9 @@ export async function getConfiguration() {
         console.log('💻 Running in local environment - using local configuration');
         const { LOCAL_CONFIG } = await import('./local-config.js');
         
-        // Convert local config to Apify input format
+        // Convert local config to Apify input format (only maxRequestsPerCrawl needed)
         const input = {
-            siteName: LOCAL_CONFIG.siteName,
-            baseUrl: LOCAL_CONFIG.baseUrl,
-            startUrl: LOCAL_CONFIG.startUrl,
-            allowedUrlPatterns: LOCAL_CONFIG.allowedUrlPatterns,
-            excludedUrlPatterns: LOCAL_CONFIG.excludedUrlPatterns,
-            paginationType: LOCAL_CONFIG.paginationType,
-            queryPattern: LOCAL_CONFIG.queryPattern,
-            pathPattern: LOCAL_CONFIG.pathPattern,
-            paginationBaseUrl: LOCAL_CONFIG.paginationBaseUrl,
-            startPage: LOCAL_CONFIG.startPage,
-            specialistLinksSelector: LOCAL_CONFIG.specialistLinksSelector,
-            nextButtonSelector: LOCAL_CONFIG.nextButtonSelector,
-            nextButtonContainerSelector: LOCAL_CONFIG.nextButtonContainerSelector,
-            doctorNameSelector: LOCAL_CONFIG.doctorNameSelector,
-            contactLinksSelector: LOCAL_CONFIG.contactLinksSelector,
-            maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl,
-            headless: LOCAL_CONFIG.headless,
-            timeout: LOCAL_CONFIG.timeout,
-            outputFilename: LOCAL_CONFIG.outputFilename,
-            userAgent: LOCAL_CONFIG.userAgent,
-            scraperMode: LOCAL_CONFIG.scraperMode,
-            scraperUrls: LOCAL_CONFIG.scraperUrls,
-            customSelectors: LOCAL_CONFIG.customSelectors,
-            cookies: LOCAL_CONFIG.cookies
+            maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl
         };
         
         return { input, isApify: false, Actor: null };

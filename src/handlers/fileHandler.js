@@ -18,51 +18,29 @@ export async function saveDataToFile(extractedData, config, originalCookies = nu
     
     console.log(`\nCrawling completed! Saving ${extractedData.length} records to ${filename}`);
     
-    // Determine if this is scraper mode or crawler mode
-    const isScraperMode = config.CRAWLER?.scraperMode || false;
-    
-    // Check if this is doctor data and restructure accordingly
-    let processedData = extractedData;
-    let totalRecords = extractedData.length;
-    
-    if (isScraperMode && extractedData.length > 0 && extractedData[0].doctors) {
-        // This is doctor data, flatten it to the desired structure
-        processedData = [];
-        extractedData.forEach(pageData => {
-            if (pageData.doctors && Array.isArray(pageData.doctors)) {
-                pageData.doctors.forEach(doctor => {
-                    processedData.push({
-                        "Dr Name": doctor.name,
-                        "Position": doctor.position,
-                        "links": doctor.links || []
-                    });
-                });
-            }
-        });
-        totalRecords = processedData.length;
-    }
-    
-    const jsonData = {
-        siteName: config.SITE.name,
-        extractedDate: new Date().toISOString().split('T')[0],
-        totalRecords: totalRecords,
-        mode: isScraperMode ? 'scraper' : 'crawler',
-        data: processedData,
-        // Keep 'specialists' for backward compatibility
-        specialists: processedData,
-        metadata: {
-            crawledAt: new Date().toISOString(),
-            sourceUrl: isScraperMode ? (config.SCRAPER?.urls?.[0] || config.SITE.startUrl) : config.SITE.startUrl,
-            scrapedUrls: isScraperMode ? config.SCRAPER?.urls : undefined,
-            customSelectors: isScraperMode ? config.SCRAPER?.customSelectors : undefined
-        },
-        // Include original cookies if provided
-        cookies: originalCookies && originalCookies.length > 0 ? originalCookies : undefined
-    };
+    // Process the extracted data - restructure so each website is its own object
+    const processedData = extractedData.map(record => {
+        return {
+            siteName: config.SITE.name,
+            extractedDate: new Date().toISOString().split('T')[0],
+            mode: 'crawler',
+            url: record.url,
+            companyName: record.companyName,
+            businessOverview: record.businessOverview,
+            extractedAt: record.extractedAt,
+            metadata: {
+                crawledAt: new Date().toISOString(),
+                sourceUrl: config.SITE.startUrl
+            },
+            // Include original cookies if provided
+            cookies: originalCookies && originalCookies.length > 0 ? originalCookies : undefined
+        };
+    });
     
     try {
-        fs.writeFileSync(filepath, JSON.stringify(jsonData, null, 2), 'utf8');
+        fs.writeFileSync(filepath, JSON.stringify(processedData, null, 2), 'utf8');
         console.log(`Data successfully saved to: ${filepath}`);
+        console.log(`Each of the ${extractedData.length} websites is now saved as a separate object`);
         return filepath;
     } catch (error) {
         console.error('Error saving data to file:', error);
