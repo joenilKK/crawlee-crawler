@@ -85,7 +85,7 @@ const CONFIG = {
         nextButtonContainer: LOCAL_CONFIG.nextButtonContainerSelector,
         doctorName: LOCAL_CONFIG.doctorNameSelector,
         specialty: LOCAL_CONFIG.specialtySelector,
-        contactLinks: LOCAL_CONFIG.contactLinksSelector,
+        contactLinks: LOCAL_CONFIG.linksSelector, // Updated to use linksSelector
         tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr'
     },
     CRAWLER: {
@@ -111,10 +111,10 @@ const CONFIG = {
             }
             
             const today = new Date().toISOString().split('T')[0];
-            return `camden-scraped-data-${today}.json`;
+            return `novena-scraped-data-${today}.json`;
         }
     },
-    COOKIES: input.cookies && input.cookies.length > 0 ? input.cookies : (LOCAL_CONFIG.cookies || []),
+    COOKIES: input.cookies && input.cookies.length > 0 ? input.cookies : (LOCAL_CONFIG.cookies || [])
 };
 
 console.log('Starting crawler with configuration:', {

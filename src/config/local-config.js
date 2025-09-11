@@ -5,15 +5,14 @@
 
 export const LOCAL_CONFIG = {
     // Site configuration - modify these for your target site
-    siteName: 'Camden Medical Centre',
-    baseUrl: 'https://www.camden.com.sg//',
-    startUrl: 'https://www.camden.com.sg/find-a-doctor?type=doctor&sid=all&search=&page=1',
+    siteName: 'Novena Medical Centre',
+    baseUrl: 'https://novenamedicalcenter.com/',
+    startUrl: 'https://novenamedicalcenter.com/our-doctors/',
     allowedUrlPatterns: [
-      'https://www.camden.com.sg/find-a-doctor?type=doctor&sid=all&search=&page=*',
-      'https://www.camden.com.sg/specialist/*',
+      'https://novenamedicalcenter.com/our-doctors/*',
     ],
     excludedUrlPatterns: [
-      'https://www.camden.com.sg/corporate/about/',
+      'https://novenamedicalcenter.com/about/',
     ],
     
     // Pagination settings
@@ -24,16 +23,16 @@ export const LOCAL_CONFIG = {
     startPage: 1,
     
     // Selectors
-    specialistLinksSelector: '.profilepic a.profileurl',
+    specialistLinksSelector: '.searchresults tbody tr td a',
     nextButtonSelector: '.list-paginationcontainer .list-pagenext',
     nextButtonContainerSelector: '.list-paginationcontainer',
-    doctorNameSelector: 'h1.masthead-title',
-    specialtySelector: '.doc-personalinfo .col .grid-box a',
-    contactLinksSelector: '.clinic-contacts a',
-    tableRowsSelector: '.clinic-contacts .grid a',
+    doctorNameSelector: '.doctors h2',
+    specialtySelector: '.speciality ul li',
+    linksSelector: '.clinicdetailstable tbody tr td a', //this can be multiple links
+    //  tableRowsSelector: '.clinic-contacts .grid a',
     
     // Crawler settings
-    maxRequestsPerCrawl: -1, // Lower for local testing, use -1 for unlimited crawling
+    maxRequestsPerCrawl: 4, // Lower for local testing, use -1 for unlimited crawling
     headless: false, // Set to false for local debugging
     timeout: 10000, // Request timeout in milliseconds
     

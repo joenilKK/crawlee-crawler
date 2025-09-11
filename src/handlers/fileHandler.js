@@ -18,17 +18,23 @@ export async function saveDataToFile(extractedData, config, originalCookies = nu
     
     console.log(`\nCrawling completed! Saving ${extractedData.length} records to ${filename}`);
     
-    // Process the extracted data - restructure so each website is its own object
+    // Process the extracted data - preserve the flattened structure from dataExtractor
     const processedData = extractedData.map(record => {
-        return {
-            extractedDate: new Date().toISOString().split('T')[0],
-            url: record.url,
-            doctorname: record.doctorname,
-            specialty: record.specialty,
-            contact: record.contact,
-            // Include original cookies if provided
-            cookies: originalCookies && originalCookies.length > 0 ? originalCookies : undefined
-        };
+        // Create a copy of the record and update the extractedAt to extractedDate for consistency
+        const processedRecord = { ...record };
+        
+        // Convert extractedAt to extractedDate (just the date part)
+        if (processedRecord.extractedAt) {
+            processedRecord.extractedDate = processedRecord.extractedAt.split('T')[0];
+            delete processedRecord.extractedAt;
+        }
+        
+        // Include original cookies if provided
+        if (originalCookies && originalCookies.length > 0) {
+            processedRecord.cookies = originalCookies;
+        }
+        
+        return processedRecord;
     });
     
     try {

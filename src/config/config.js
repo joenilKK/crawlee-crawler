@@ -1,21 +1,20 @@
 /**
- * Configuration settings for the Camden Medical Centre crawler
+ * Configuration settings for the Novena Medical Centre crawler
  * This configuration is synced with local-config.js for Apify actor deployment
  */
 
 export const CONFIG = {
     // Site configuration - synced with local-config.js
     SITE: {
-        name: 'Camden Medical Centre',
-        baseUrl: 'https://www.camden.com.sg//',
-        startUrl: 'https://www.camden.com.sg/find-a-doctor?type=doctor&sid=all&search=&page=1',
+        name: 'Novena Medical Centre',
+        baseUrl: 'https://novenamedicalcenter.com/',
+        startUrl: 'https://novenamedicalcenter.com/our-doctors/',
         allowedUrlPatterns: [
-            'https://www.camden.com.sg/find-a-doctor?type=doctor&sid=all&search=&page=*',
-            'https://www.camden.com.sg/specialist/*'
+            'https://novenamedicalcenter.com/our-doctors/*'
         ],
         // Patterns to exclude (optional)
         excludedUrlPatterns: [
-            'https://www.camden.com.sg/corporate/about/'
+            'https://novenamedicalcenter.com/about/'
         ],
         // Pagination configuration
         pagination: {
@@ -30,21 +29,21 @@ export const CONFIG = {
     // Selectors for web scraping - synced with local-config.js
     SELECTORS: {
         // Specialist listing page selectors
-        specialistLinks: '.profilepic a.profileurl',
+        specialistLinks: '.searchresults tbody tr td a',
         nextButton: '.list-paginationcontainer .list-pagenext',
         nextButtonContainer: '.list-paginationcontainer',
         
         // Specialist detail page selectors
-        doctorName: 'h1.masthead-title',
-        specialty: '.doc-personalinfo .col .grid-box a',
-        contactLinks: '.clinic-contacts a',
-        tableRows: '.clinic-contacts .grid a'
+        doctorName: '.doctors h2',
+        specialty: '.speciality ul li',
+        contactLinks: '.clinicdetailstable tbody tr td a',
+        tableRows: '.panel-body tbody tr' // Default fallback selector
     },
 
     // Crawler settings
     CRAWLER: {
-        maxRequestsPerCrawl: 200, // Use -1 for unlimited crawling - will be overridden by actor input
-        headless: true, // Set to true for production
+        maxRequestsPerCrawl: 4, // Use -1 for unlimited crawling - will be overridden by actor input
+        headless: false, // Set to false for local debugging, true for production
         timeout: 10000,
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         labels: {
@@ -56,8 +55,14 @@ export const CONFIG = {
     // File output settings
     OUTPUT: {
         getFilename: () => {
+            // Use custom filename from local config if available
+            const customFilename = 'mtalvernia-scraped-data';
+            if (customFilename && customFilename.trim() !== '') {
+                return customFilename.endsWith('.json') ? customFilename : `${customFilename}.json`;
+            }
+            
             const today = new Date().toISOString().split('T')[0];
-            return `camden-scraped-data-${today}.json`;
+            return `novena-scraped-data-${today}.json`;
         }
     },
 
