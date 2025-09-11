@@ -32,7 +32,7 @@ export const LOCAL_CONFIG = {
     //  tableRowsSelector: '.clinic-contacts .grid a',
     
     // Crawler settings
-    maxRequestsPerCrawl: 4, // Lower for local testing, use -1 for unlimited crawling
+    maxRequestsPerCrawl: -1, // Use -1 for unlimited crawling in production, 4 for local testing
     headless: false, // Set to false for local debugging
     timeout: 10000, // Request timeout in milliseconds
     

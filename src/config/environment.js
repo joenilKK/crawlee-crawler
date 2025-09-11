@@ -29,7 +29,18 @@ export async function getConfiguration() {
             throw new Error('❌ No input provided to Apify Actor');
         }
         
-        return { input, isApify: true, Actor };
+        // Import local config to get default values for missing fields
+        const { LOCAL_CONFIG } = await import('./local-config.js');
+        
+        // Ensure required fields have default values from local config
+        const processedInput = {
+            maxRequestsPerCrawl: input.maxRequestsPerCrawl !== undefined ? input.maxRequestsPerCrawl : LOCAL_CONFIG.maxRequestsPerCrawl,
+            cookies: input.cookies || LOCAL_CONFIG.cookies || [],
+            headless: input.headless !== undefined ? input.headless : LOCAL_CONFIG.headless,
+            outputFilename: input.outputFilename || LOCAL_CONFIG.outputFilename || ''
+        };
+        
+        return { input: processedInput, isApify: true, Actor };
     } else {
         console.log('💻 Running in local environment - using local configuration');
         const { LOCAL_CONFIG } = await import('./local-config.js');
