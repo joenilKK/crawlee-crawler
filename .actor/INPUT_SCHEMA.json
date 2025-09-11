@@ -1,18 +1,9 @@
 { 
-    "title": "Camden Medical Centre Crawler",
-    "description": "Web crawler for extracting specialist doctor information from Camden Medical Centre website. Configurable with request limits and optional cookie support for authenticated scraping.",
+    "title": "Farrer Park Hospital Crawler",
+    "description": "Web crawler for extracting specialist doctor information from Farrer Park Hospital website. Crawls all pages with optional cookie support for authenticated scraping.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
-        "maxRequestsPerCrawl": {
-            "title": "✅ Max Requests Per Crawl (REQUIRED)",
-            "type": "integer",
-            "description": "Maximum number of requests to process. Use -1 for unlimited crawling. Recommended: 50-200 for testing, -1 for full crawl.",
-            "minimum": -1,
-            "maximum": 10000,
-            "editor": "number",
-            "prefill": 200
-        },
         "cookies": {
             "title": "🍪 Cookies (Optional)",
             "type": "array",
@@ -24,36 +15,44 @@
                 "properties": {
                     "name": {
                         "type": "string",
-                        "title": "Cookie Name"
+                        "title": "Cookie Name",
+                        "description": "The name of the cookie"
                     },
                     "value": {
                         "type": "string",
-                        "title": "Cookie Value"
+                        "title": "Cookie Value",
+                        "description": "The value of the cookie"
                     },
                     "domain": {
                         "type": "string",
-                        "title": "Domain"
+                        "title": "Domain",
+                        "description": "The domain for which the cookie is valid"
                     },
                     "path": {
                         "type": "string",
-                        "title": "Path"
+                        "title": "Path",
+                        "description": "The path for which the cookie is valid"
                     },
                     "secure": {
                         "type": "boolean",
-                        "title": "Secure"
+                        "title": "Secure",
+                        "description": "Whether the cookie should only be sent over HTTPS"
                     },
                     "httpOnly": {
                         "type": "boolean",
-                        "title": "HTTP Only"
+                        "title": "HTTP Only",
+                        "description": "Whether the cookie should only be accessible via HTTP(S) and not JavaScript"
                     },
                     "sameSite": {
                         "type": "string",
                         "title": "Same Site",
+                        "description": "The SameSite attribute of the cookie",
                         "enum": ["no_restriction", "lax", "strict"]
                     },
                     "expirationDate": {
                         "type": "number",
-                        "title": "Expiration Date (Unix timestamp)"
+                        "title": "Expiration Date (Unix timestamp)",
+                        "description": "The expiration date of the cookie as Unix timestamp"
                     }
                 },
                 "required": ["name", "value", "domain"]
@@ -69,12 +68,10 @@
         "outputFilename": {
             "title": "📁 Output Filename (Optional)",
             "type": "string",
-            "description": "Custom filename for the output JSON file (without .json extension). If not provided, will use default naming with date.",
+            "description": "Custom filename for the output JSON file (without .json extension). If not provided, will use default naming.",
             "editor": "textfield",
-            "prefill": ""
+            "prefill": "mtalvernia-scraped-data"
         }
     },
-    "required": [
-        "maxRequestsPerCrawl"
-    ]
+    "required": []
 }
