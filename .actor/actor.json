@@ -1,9 +1,9 @@
-{
+ {
   "actorSpecification": 1,
-  "name": "web-scraper-crawler",
-  "title": "Web Scraper & Crawler",
-  "description": "Flexible web scraper that can crawl websites for specialist data or scrape specific URLs with custom selectors. Supports both crawling mode for discovering pages and scraper-only mode for targeted data extraction. Includes cookie support for authenticated scraping.",
-  "version": "1.0.0",
+  "name": "camden-medical-crawler",
+  "title": "Camden Medical Centre Crawler",
+  "description": "Specialized web crawler for extracting specialist doctor information from Camden Medical Centre website. Features configurable request limits, cookie support for authenticated scraping, and comprehensive data extraction including doctor profiles, specialties, and contact information.",
+  "version": "1.1.0",
   "meta": {
     "templateId": "crawlee-playwright-js"
   },

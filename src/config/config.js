@@ -1,60 +1,52 @@
 /**
- * Configuration settings for the Mount Elizabeth crawler
+ * Configuration settings for the Camden Medical Centre crawler
+ * This configuration is synced with local-config.js for Apify actor deployment
  */
 
 export const CONFIG = {
-    // Site configuration
+    // Site configuration - synced with local-config.js
     SITE: {
-        name: 'Mount Elizabeth Medical Centre',
-        baseUrl: 'https://www.mountelizabeth.com.sg/',
-        startUrl: 'https://www.mountelizabeth.com.sg/patient-services/specialists/',
+        name: 'Camden Medical Centre',
+        baseUrl: 'https://www.camden.com.sg//',
+        startUrl: 'https://www.camden.com.sg/find-a-doctor?type=doctor&sid=all&search=&page=1',
         allowedUrlPatterns: [
-            'https://www.mountelizabeth.com.sg/patient-services/specialists/',
-            'https://www.mountelizabeth.com.sg/patient-services/specialists/*'
+            'https://www.camden.com.sg/find-a-doctor?type=doctor&sid=all&search=&page=*',
+            'https://www.camden.com.sg/specialist/*'
         ],
         // Patterns to exclude (optional)
         excludedUrlPatterns: [
-            'https://www.mountelizabeth.com.sg/patient-services/specialty_areas/*',
-            'https://www.mountelizabeth.com.sg/patient-services/health-screening/*',
-            'https://www.mountelizabeth.com.sg/patient-services/about/*'
+            'https://www.camden.com.sg/corporate/about/'
         ],
         // Pagination configuration
         pagination: {
-            // Type of pagination: 'query' (e.g., ?page=2) or 'path' (e.g., /page/2/)
-            // example for query
-            //type: 'query',
-            // queryPattern: 'page={page}',
-            //==============================================
-            // example for path
-            //type: 'path',
-            //pathPattern: '/page/{page}/',
-
             type: 'query',
             queryPattern: 'page={page}',
-            // Base URL for pagination (if different from startUrl)
+            pathPattern: '',
             baseUrl: null, // Uses startUrl by default
-            // Starting page number (usually 1)
             startPage: 1
         }
     },
 
-    // Selectors for web scraping
+    // Selectors for web scraping - synced with local-config.js
     SELECTORS: {
         // Specialist listing page selectors
-        specialistLinks: '#gridcontent-desktop a.moe-fp-view-profile',
-        nextButton: '.page-item.next a.page-link',
-        nextButtonContainer: '.page-item.next',
+        specialistLinks: '.profilepic a.profileurl',
+        nextButton: '.list-paginationcontainer .list-pagenext',
+        nextButtonContainer: '.list-paginationcontainer',
         
         // Specialist detail page selectors
-        doctorName: '.profile-text .profile-name',
-        contactLinks: '.mp-pac .mp-pac-box a.moe-vp-pac'
+        doctorName: 'h1.masthead-title',
+        specialty: '.doc-personalinfo .col .grid-box a',
+        contactLinks: '.clinic-contacts a',
+        tableRows: '.clinic-contacts .grid a'
     },
 
     // Crawler settings
     CRAWLER: {
-        maxRequestsPerCrawl: 200, // Use -1 for unlimited crawling
+        maxRequestsPerCrawl: 200, // Use -1 for unlimited crawling - will be overridden by actor input
         headless: true, // Set to true for production
         timeout: 10000,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         labels: {
             DETAIL: 'DETAIL',
             SPECIALISTS_LIST: 'SPECIALISTS_LIST'
@@ -65,7 +57,10 @@ export const CONFIG = {
     OUTPUT: {
         getFilename: () => {
             const today = new Date().toISOString().split('T')[0];
-            return `memc-specialists-${today}.json`;
+            return `camden-scraped-data-${today}.json`;
         }
-    }
+    },
+
+    // Cookies configuration (empty by default, can be added via input)
+    COOKIES: []
 };

@@ -63,7 +63,7 @@ if (input.maxRequestsPerCrawl === undefined || input.maxRequestsPerCrawl === nul
 // Import local configuration for hardcoded values
 const { LOCAL_CONFIG } = await import('./config/local-config.js');
 
-// Create configuration object using local config with only maxRequestsPerCrawl from input
+// Create configuration object using local config with input overrides
 const CONFIG = {
     SITE: {
         name: LOCAL_CONFIG.siteName,
@@ -90,8 +90,9 @@ const CONFIG = {
     },
     CRAWLER: {
         maxRequestsPerCrawl: input.maxRequestsPerCrawl,
-        headless: LOCAL_CONFIG.headless,
+        headless: input.headless !== undefined ? input.headless : LOCAL_CONFIG.headless,
         timeout: LOCAL_CONFIG.timeout,
+        userAgent: LOCAL_CONFIG.userAgent,
         labels: {
             DETAIL: 'DETAIL',
             SPECIALISTS_LIST: 'SPECIALISTS_LIST'
@@ -99,14 +100,21 @@ const CONFIG = {
     },
     OUTPUT: {
         getFilename: () => {
-            if (LOCAL_CONFIG.outputFilename && LOCAL_CONFIG.outputFilename.trim() !== '') {
-                return LOCAL_CONFIG.outputFilename.endsWith('.json') ? LOCAL_CONFIG.outputFilename : `${LOCAL_CONFIG.outputFilename}.json`;
+            // Use input filename if provided, otherwise use local config, otherwise use default
+            const customFilename = input.outputFilename && input.outputFilename.trim() !== '' ? 
+                input.outputFilename : 
+                (LOCAL_CONFIG.outputFilename && LOCAL_CONFIG.outputFilename.trim() !== '' ? 
+                    LOCAL_CONFIG.outputFilename : null);
+                    
+            if (customFilename) {
+                return customFilename.endsWith('.json') ? customFilename : `${customFilename}.json`;
             }
+            
             const today = new Date().toISOString().split('T')[0];
-            return `memc-specialists-${today}.json`;
+            return `camden-scraped-data-${today}.json`;
         }
     },
-    COOKIES: LOCAL_CONFIG.cookies || [],
+    COOKIES: input.cookies && input.cookies.length > 0 ? input.cookies : (LOCAL_CONFIG.cookies || []),
 };
 
 console.log('Starting crawler with configuration:', {
@@ -137,6 +145,20 @@ const crawler = new PlaywrightCrawler({
             headless: CONFIG.CRAWLER.headless,
             ignoreHTTPSErrors: true
         }
+    },
+    browserPoolOptions: {
+        useFingerprints: false,
+        preLaunchHooks: [
+            async (pageId, launchContext) => {
+                launchContext.launchOptions = {
+                    ...launchContext.launchOptions,
+                    args: [
+                        ...launchContext.launchOptions.args || [],
+                        `--user-agent=${CONFIG.CRAWLER.userAgent}`
+                    ]
+                };
+            }
+        ]
     },
     // Add pre-navigation handler to set cookies
     preNavigationHooks: [

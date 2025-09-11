@@ -1,17 +1,77 @@
-{
-    "title": "Web Crawler",
-    "description": "Simple web crawler with configurable request limits.",
+{ 
+    "title": "Camden Medical Centre Crawler",
+    "description": "Web crawler for extracting specialist doctor information from Camden Medical Centre website. Configurable with request limits and optional cookie support for authenticated scraping.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
         "maxRequestsPerCrawl": {
             "title": "✅ Max Requests Per Crawl (REQUIRED)",
             "type": "integer",
-            "description": "Maximum number of requests to process - This field is required, use -1 for unlimited crawling",
-            "minimum": 1,
+            "description": "Maximum number of requests to process. Use -1 for unlimited crawling. Recommended: 50-200 for testing, -1 for full crawl.",
+            "minimum": -1,
             "maximum": 10000,
             "editor": "number",
             "prefill": 200
+        },
+        "cookies": {
+            "title": "🍪 Cookies (Optional)",
+            "type": "array",
+            "description": "Optional array of cookies for authenticated scraping. Each cookie should be in browser extension format with fields: name, value, domain, path, secure, httpOnly, sameSite, expirationDate.",
+            "editor": "json",
+            "prefill": [],
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "title": "Cookie Name"
+                    },
+                    "value": {
+                        "type": "string",
+                        "title": "Cookie Value"
+                    },
+                    "domain": {
+                        "type": "string",
+                        "title": "Domain"
+                    },
+                    "path": {
+                        "type": "string",
+                        "title": "Path"
+                    },
+                    "secure": {
+                        "type": "boolean",
+                        "title": "Secure"
+                    },
+                    "httpOnly": {
+                        "type": "boolean",
+                        "title": "HTTP Only"
+                    },
+                    "sameSite": {
+                        "type": "string",
+                        "title": "Same Site",
+                        "enum": ["no_restriction", "lax", "strict"]
+                    },
+                    "expirationDate": {
+                        "type": "number",
+                        "title": "Expiration Date (Unix timestamp)"
+                    }
+                },
+                "required": ["name", "value", "domain"]
+            }
+        },
+        "headless": {
+            "title": "🖥️ Headless Mode",
+            "type": "boolean",
+            "description": "Run browser in headless mode. Set to false for debugging, true for production.",
+            "default": true,
+            "prefill": true
+        },
+        "outputFilename": {
+            "title": "📁 Output Filename (Optional)",
+            "type": "string",
+            "description": "Custom filename for the output JSON file (without .json extension). If not provided, will use default naming with date.",
+            "editor": "textfield",
+            "prefill": ""
         }
     },
     "required": [
