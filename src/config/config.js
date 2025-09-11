@@ -63,11 +63,11 @@ export const CONFIG = {
         // Custom data extraction selectors (for scraper mode)
         customSelectors: {
             // Define selectors for doctor cards/containers
-            doctorCards: '.doctor-card, .doctor-item, .profile-card, .specialist-card, .card',
-            doctorName: 'h4.doctor-name',
-            position: '.wrap.top_wrap .right > p',
+            doctorCards: '.doctor',
+            doctorName: 'h4.doctor-name, .left h4',
+            position: '.right > p',
             phoneLinks: '.tel_number a',
-            Website: '.wrap .right p a',
+            Website: '.right p a',
             // You can add more custom selectors as needed
         }
     },

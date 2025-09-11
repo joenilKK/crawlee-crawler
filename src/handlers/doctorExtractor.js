@@ -25,21 +25,13 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
         
         // Extract doctors data by iterating through each doctor card
         const doctors = await page.evaluate((selectors) => {
+            console.log(`Looking for doctor cards with selector: ${selectors.doctorCards}`);
             const doctorElements = document.querySelectorAll(selectors.doctorCards);
+            console.log(`Found ${doctorElements.length} doctor cards`);
             const doctorsData = [];
             
-            // Check for global website (outside of individual doctor cards)
+            // Don't use global website - each doctor should have their own website
             let globalWebsite = '';
-            if (selectors.Website) {
-                const globalWebsiteEl = document.querySelector(selectors.Website);
-                if (globalWebsiteEl) {
-                    if (globalWebsiteEl.href) {
-                        globalWebsite = globalWebsiteEl.href;
-                    } else if (globalWebsiteEl.textContent.trim()) {
-                        globalWebsite = globalWebsiteEl.textContent.trim();
-                    }
-                }
-            }
             
             // If no doctor cards found, try to extract from the entire page as individual lists
             if (doctorElements.length === 0) {
@@ -82,16 +74,26 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                                 }
                             });
                             
-                            // Look for website
+                            // Look for website with multiple strategies
                             if (selectors.Website) {
                                 const websiteEl = currentElement.querySelector(selectors.Website);
                                 if (websiteEl) {
                                     if (websiteEl.href) {
-                                        // If it's a link, get the href
                                         website = websiteEl.href;
                                     } else if (websiteEl.textContent.trim()) {
-                                        // Otherwise get the text content
                                         website = websiteEl.textContent.trim();
+                                    }
+                                }
+                            }
+                            
+                            // Fallback: Look for any HTTP links if no website found
+                            if (!website) {
+                                const httpLinks = currentElement.querySelectorAll('a[href^="http"], a[href^="https"], a[href^="www"]');
+                                for (const link of httpLinks) {
+                                    const href = link.href || link.getAttribute('href');
+                                    if (href && !href.includes('tel:') && !href.includes('mailto:')) {
+                                        website = href.startsWith('www') ? 'http://' + href : href;
+                                        break;
                                     }
                                 }
                             }
@@ -103,7 +105,7 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                         }
                         
                         doctorData.links = nearbyPhones;
-                        doctorData.website = website || globalWebsite;
+                        doctorData.website = website; // Don't fallback to globalWebsite
                         doctorsData.push(doctorData);
                     }
                 }
@@ -135,16 +137,48 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                         }
                     });
                     
-                    // Extract website from within this card, or use global website
-                    const websiteEl = card.querySelector(selectors.Website);
-                    let website = globalWebsite; // Use global website as default
-                    if (websiteEl) {
-                        if (websiteEl.href) {
-                            // If it's a link, get the href
-                            website = websiteEl.href;
-                        } else if (websiteEl.textContent.trim()) {
-                            // Otherwise get the text content
-                            website = websiteEl.textContent.trim();
+                    // Extract website from within this card with multiple fallback strategies
+                    let website = '';
+                    
+                    // Strategy 1: Use provided selector
+                    if (selectors.Website) {
+                        console.log(`Looking for website with selector: ${selectors.Website}`);
+                        const websiteEl = card.querySelector(selectors.Website);
+                        console.log(`Website element found:`, websiteEl ? 'YES' : 'NO');
+                        if (websiteEl) {
+                            console.log(`Website element href: ${websiteEl.href}`);
+                            console.log(`Website element text: ${websiteEl.textContent.trim()}`);
+                            if (websiteEl.href) {
+                                website = websiteEl.href;
+                                console.log(`Website extracted from href: ${website}`);
+                            } else if (websiteEl.textContent.trim()) {
+                                website = websiteEl.textContent.trim();
+                                console.log(`Website extracted from text: ${website}`);
+                            }
+                        }
+                    }
+                    
+                    // Strategy 2: Look for any HTTP links if no website found
+                    if (!website) {
+                        const httpLinks = card.querySelectorAll('a[href^="http"], a[href^="https"], a[href^="www"]');
+                        for (const link of httpLinks) {
+                            const href = link.href || link.getAttribute('href');
+                            if (href && !href.includes('tel:') && !href.includes('mailto:')) {
+                                website = href.startsWith('www') ? 'http://' + href : href;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Strategy 3: Look for text that looks like a website URL
+                    if (!website) {
+                        const textNodes = card.querySelectorAll('p, span, div');
+                        for (const node of textNodes) {
+                            const text = node.textContent.trim();
+                            if (text.match(/^(https?:\/\/)?(www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?$/)) {
+                                website = text.startsWith('http') ? text : 'http://' + text;
+                                break;
+                            }
                         }
                     }
                     
@@ -180,7 +214,7 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
         if (doctors.length > 0) {
             console.log('📋 Sample doctors extracted:');
             doctors.slice(0, 3).forEach((doctor, index) => {
-                console.log(`   ${index + 1}. ${doctor.name} - ${doctor.position} (${doctor.links.length} phone numbers)`);
+                console.log(`   ${index + 1}. ${doctor.name} - ${doctor.position} (${doctor.links.length} phone numbers, website: ${doctor.website || 'none'})`);
             });
         }
         
@@ -208,18 +242,8 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
         const doctors = await page.evaluate((selectors) => {
             const doctorsData = [];
             
-            // Check for global website (outside of individual doctor cards)
+            // Don't use global website - each doctor should have their own website
             let globalWebsite = '';
-            if (selectors.Website) {
-                const globalWebsiteEl = document.querySelector(selectors.Website);
-                if (globalWebsiteEl) {
-                    if (globalWebsiteEl.href) {
-                        globalWebsite = globalWebsiteEl.href;
-                    } else if (globalWebsiteEl.textContent.trim()) {
-                        globalWebsite = globalWebsiteEl.textContent.trim();
-                    }
-                }
-            }
             
             // Method 1: Look for name-position-phone patterns
             const nameElements = document.querySelectorAll(selectors.doctorName);
@@ -276,16 +300,26 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
                         }
                     });
                     
-                    // Look for website
+                    // Look for website with multiple strategies
                     if (selectors.Website) {
                         const websiteEl = parentEl.querySelector(selectors.Website);
                         if (websiteEl) {
                             if (websiteEl.href) {
-                                // If it's a link, get the href
                                 website = websiteEl.href;
                             } else if (websiteEl.textContent.trim()) {
-                                // Otherwise get the text content
                                 website = websiteEl.textContent.trim();
+                            }
+                        }
+                    }
+                    
+                    // Fallback: Look for any HTTP links if no website found
+                    if (!website) {
+                        const httpLinks = parentEl.querySelectorAll('a[href^="http"], a[href^="https"], a[href^="www"]');
+                        for (const link of httpLinks) {
+                            const href = link.href || link.getAttribute('href');
+                            if (href && !href.includes('tel:') && !href.includes('mailto:')) {
+                                website = href.startsWith('www') ? 'http://' + href : href;
+                                break;
                             }
                         }
                     }
@@ -300,7 +334,7 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
                     name: name,
                     position: position,
                     links: links,
-                    website: website || globalWebsite
+                    website: website // Don't fallback to globalWebsite
                 });
             });
             
