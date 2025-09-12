@@ -34,9 +34,9 @@ export async function getConfiguration() {
         console.log('💻 Running in local environment - using local configuration');
         const { LOCAL_CONFIG } = await import('./local-config.js');
         
-        // Convert local config to Apify input format (only maxRequestsPerCrawl needed)
+        // Convert local config to Apify input format (only outputFilename needed)
         const input = {
-            maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl
+            outputFilename: LOCAL_CONFIG.outputFilename
         };
         
         return { input, isApify: false, Actor: null };

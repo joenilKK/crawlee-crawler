@@ -53,8 +53,8 @@ function convertCookiesToPlaywrightFormat(cookies) {
 const { input, isApify, Actor } = await getConfiguration();
 
 // Validate required input field
-if (!input.maxRequestsPerCrawl || input.maxRequestsPerCrawl < 1) {
-    const errorMessage = `❌ CONFIGURATION ERROR: maxRequestsPerCrawl is required and must be a positive integer.`;
+if (!input.outputFilename || input.outputFilename.trim() === '') {
+    const errorMessage = `❌ CONFIGURATION ERROR: outputFilename is required and must be a non-empty string.`;
     console.error(errorMessage);
     throw new Error(errorMessage);
 }
@@ -62,7 +62,7 @@ if (!input.maxRequestsPerCrawl || input.maxRequestsPerCrawl < 1) {
 // Import local configuration for hardcoded values
 const { LOCAL_CONFIG } = await import('./config/local-config.js');
 
-// Create configuration object using local config with only maxRequestsPerCrawl from input
+// Create configuration object using local config with output filename from input
 const CONFIG = {
     SITE: {
         name: LOCAL_CONFIG.siteName,
@@ -87,7 +87,7 @@ const CONFIG = {
         tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr'
     },
     CRAWLER: {
-        maxRequestsPerCrawl: input.maxRequestsPerCrawl,
+        maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl,
         headless: LOCAL_CONFIG.headless,
         timeout: LOCAL_CONFIG.timeout,
         labels: {
@@ -97,8 +97,8 @@ const CONFIG = {
     },
     OUTPUT: {
         getFilename: () => {
-            if (LOCAL_CONFIG.outputFilename && LOCAL_CONFIG.outputFilename.trim() !== '') {
-                return LOCAL_CONFIG.outputFilename.endsWith('.json') ? LOCAL_CONFIG.outputFilename : `${LOCAL_CONFIG.outputFilename}.json`;
+            if (input.outputFilename && input.outputFilename.trim() !== '') {
+                return input.outputFilename.endsWith('.json') ? input.outputFilename : `${input.outputFilename}.json`;
             }
             const today = new Date().toISOString().split('T')[0];
             return `memc-specialists-${today}.json`;
@@ -111,6 +111,7 @@ console.log('Starting crawler with configuration:', {
     environment: isApify ? 'Apify' : 'Local',
     siteName: CONFIG.SITE.name,
     startUrl: CONFIG.SITE.startUrl,
+    outputFilename: CONFIG.OUTPUT.getFilename(),
     maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl === -1 ? 'unlimited' : CONFIG.CRAWLER.maxRequestsPerCrawl,
     headless: CONFIG.CRAWLER.headless
 });
