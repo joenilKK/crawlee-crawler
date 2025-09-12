@@ -1,28 +1,253 @@
 import { PlaywrightCrawler } from 'crawlee';
+import { chromium } from 'playwright';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
-import { handlePagination, handleInitialPagination } from './handlers/paginationHandler.js';
+import { handlePagination, handleInitialPagination, handleAjaxPagination } from './handlers/paginationHandler.js';
 import { shouldCrawlUrl } from './utils/helpers.js';
-import { 
-    getRandomViewport, 
-    getRealisticHeaders, 
-    getHardwareInfo, 
-    getScreenProperties,
-    getConnectionInfo,
-    getBatteryInfo,
-    getWebGLInfo,
-    getMediaDevices,
-    getChromeLoadTimes,
-    getChromeCSI,
-    generateMousePath,
-    getTypingDelay,
-    getScrollBehavior
-} from './utils/stealth.js';
 import { 
     getConfiguration, 
     handleDataOutput, 
     handleExit 
 } from './config/environment.js';
+
+/**
+ * Extract data from a single entity using a fresh browser instance
+ * @param {string} entityUrl - URL of the entity to extract
+ * @param {Object} config - Configuration object
+ * @returns {Object} - Extracted entity data or error info
+ */
+async function extractEntityWithFreshBrowser(entityUrl, config) {
+    let browser = null;
+    let page = null;
+    
+    try {
+        console.log(`🆕 Starting fresh browser for: ${entityUrl}`);
+        
+        // Create fresh browser instance
+        browser = await chromium.launch({
+            headless: config.LOCAL_CONFIG?.headless !== false,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--disable-web-security', // Help prevent ad interference
+                '--disable-features=VizDisplayCompositor', // Reduce ad rendering issues
+                '--no-zygote',
+                '--disable-gpu',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--memory-pressure-off',
+                '--max_old_space_size=2048',
+                '--no-crash-upload',
+                '--disable-breakpad',
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-default-apps',
+                '--disable-sync'
+            ]
+        });
+        
+        page = await browser.newPage();
+        
+        // Block ads and trackers to prevent interference
+        await page.route('**/*', (route) => {
+            const url = route.request().url();
+            if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication'))) {
+                route.abort();
+            } else {
+                route.continue();
+            }
+        });
+        
+        // Set timeouts
+        page.setDefaultTimeout(config.LOCAL_CONFIG?.timeout || 10000);
+        page.setDefaultNavigationTimeout(config.LOCAL_CONFIG?.timeout || 10000);
+        
+        // Navigate to entity page
+        console.log(`📄 Navigating to: ${entityUrl}`);
+        await page.goto(entityUrl, { waitUntil: 'networkidle' });
+        
+        // Wait a bit for page to stabilize
+        await page.waitForTimeout(1000);
+        
+        // Extract data
+        console.log(`🔍 Extracting data from: ${entityUrl}`);
+        const entityData = await extractSpecialistData(page, entityUrl, config);
+        entityData.url = entityUrl;
+        
+        console.log(`✅ Successfully extracted: ${entityData.entityName || 'Unknown'}`);
+        return { success: true, data: entityData };
+        
+    } catch (error) {
+        console.error(`❌ Failed to extract ${entityUrl}:`, error.message);
+        return { 
+            success: false, 
+            error: error.message,
+            data: {
+                url: entityUrl,
+                entityName: 'Extraction failed',
+                overview: [],
+                error: error.message
+            }
+        };
+    } finally {
+        // Always cleanup
+        try {
+            if (page) await page.close();
+            if (browser) await browser.close();
+            console.log(`🧹 Cleaned up browser for: ${entityUrl}`);
+        } catch (cleanupError) {
+            console.warn(`⚠️ Cleanup warning for ${entityUrl}:`, cleanupError.message);
+        }
+    }
+}
+
+/**
+ * Check if page and browser context are still alive
+ * @param {Page} page - Playwright page object
+ * @returns {boolean} - true if page is alive, false otherwise
+ */
+async function isPageAlive(page) {
+    try {
+        if (!page || page.isClosed()) {
+            return false;
+        }
+        
+        // Try a simple operation to check if page is responsive
+        await page.evaluate(() => document.title);
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+/**
+ * Create a new browser page when the current one is dead
+ * @param {Browser} browser - Playwright browser object
+ * @returns {Promise<Page>} - New page object
+ */
+async function createNewPage(browser) {
+    try {
+        const context = await browser.newContext({
+            userAgent: CONFIG.CRAWLER.userAgent,
+            ignoreHTTPSErrors: true
+        });
+        
+        const page = await context.newPage();
+        console.log('🔄 Created new browser page due to previous page being closed');
+        return page;
+    } catch (error) {
+        console.error('Failed to create new page:', error);
+        throw error;
+    }
+}
+
+/**
+ * Safe navigation with retry logic
+ * @param {Page} page - Playwright page object
+ * @param {string} url - URL to navigate to
+ * @param {Object} options - Navigation options
+ * @returns {Promise<void>}
+ */
+async function safeGoto(page, url, options = {}) {
+    const maxAttempts = 3;
+    let attempt = 1;
+    
+    while (attempt <= maxAttempts) {
+        try {
+            if (!(await isPageAlive(page))) {
+                throw new Error('Page is not alive');
+            }
+            
+            await page.goto(url, { 
+                waitUntil: 'networkidle',
+                timeout: 30000,
+                ...options 
+            });
+            return; // Success
+            
+        } catch (error) {
+            console.log(`Navigation attempt ${attempt}/${maxAttempts} failed: ${error.message}`);
+            
+            if (attempt === maxAttempts) {
+                throw error; // Final attempt failed
+            }
+            
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+            attempt++;
+        }
+    }
+}
+
+/**
+ * Safe wait with page validation
+ * @param {Page} page - Playwright page object
+ * @param {number} timeout - Timeout in milliseconds
+ * @returns {Promise<void>}
+ */
+async function safeWaitForTimeout(page, timeout) {
+    try {
+        if (!(await isPageAlive(page))) {
+            throw new Error('Page is not alive');
+        }
+        
+        await page.waitForTimeout(timeout);
+    } catch (error) {
+        console.log(`Safe wait failed: ${error.message}`);
+        // Use regular setTimeout as fallback
+        await new Promise(resolve => setTimeout(resolve, timeout));
+    }
+}
+
+/**
+ * Proactive page health maintenance
+ * @param {Page} page - Playwright page object
+ * @returns {Promise<void>}
+ */
+async function maintainPageHealth(page) {
+    try {
+        // Clear browser cache and memory periodically
+        await page.evaluate(() => {
+            // Clear console
+            if (console.clear) console.clear();
+            
+            // Force garbage collection if available
+            if (window.gc) window.gc();
+            
+            // Clear any intervals/timeouts
+            const highestTimeoutId = setTimeout(() => {}, 0);
+            for (let i = 0; i < highestTimeoutId; i++) {
+                clearTimeout(i);
+                clearInterval(i);
+            }
+        });
+        
+        // Add a small delay to let cleanup complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+    } catch (error) {
+        // Ignore errors during cleanup
+    }
+}
+
+/**
+ * Refresh page connection to prevent staleness
+ * @param {Page} page - Playwright page object
+ * @returns {Promise<void>}
+ */
+async function refreshPageConnection(page) {
+    try {
+        // Navigate to about:blank and back to reset page state
+        await page.goto('about:blank', { waitUntil: 'load', timeout: 5000 });
+        await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+        // Ignore refresh errors
+    }
+}
 
 /**
  * Convert browser extension cookies to Playwright format
@@ -68,38 +293,87 @@ function convertCookiesToPlaywrightFormat(cookies) {
 const { input, isApify, Actor } = await getConfiguration();
 
 // Validate required input field
-if (!input.outputFilename || input.outputFilename.trim() === '') {
-    const errorMessage = `❌ CONFIGURATION ERROR: outputFilename is required and must be a non-empty string.`;
+if (input.maxRequestsPerCrawl === undefined || input.maxRequestsPerCrawl === null || 
+    (input.maxRequestsPerCrawl !== -1 && input.maxRequestsPerCrawl < 1)) {
+    const errorMessage = `❌ CONFIGURATION ERROR: maxRequestsPerCrawl is required and must be a positive integer or -1 for unlimited crawling.`;
     console.error(errorMessage);
     throw new Error(errorMessage);
 }
 
-// Import configuration from config.js
-const { CONFIG: BASE_CONFIG } = await import('./config/config.js');
+// Import local configuration for hardcoded values
+const { LOCAL_CONFIG } = await import('./config/local-config.js');
 
-// Create configuration object using base config with output filename from input
+// Create configuration object using local config with input overrides
 const CONFIG = {
-    ...BASE_CONFIG,
+    SITE: {
+        name: LOCAL_CONFIG.siteName,
+        baseUrl: LOCAL_CONFIG.baseUrl,
+        startUrl: process.env.TARGET_PAGE_URL || LOCAL_CONFIG.startUrl,
+        allowedUrlPatterns: LOCAL_CONFIG.allowedUrlPatterns,
+        excludedUrlPatterns: LOCAL_CONFIG.excludedUrlPatterns || [],
+        pagination: {
+            type: LOCAL_CONFIG.paginationType,
+            queryPattern: LOCAL_CONFIG.queryPattern || 'page={page}',
+            pathPattern: LOCAL_CONFIG.pathPattern || '/page/{page}/',
+            baseUrl: LOCAL_CONFIG.paginationBaseUrl || null,
+            startPage: LOCAL_CONFIG.startPage || 1,
+            maxPages: LOCAL_CONFIG.maxPages || 11
+        }
+    },
+    SELECTORS: {
+        specialistLinks: LOCAL_CONFIG.specialistLinksSelector,
+        nextButton: LOCAL_CONFIG.nextButtonSelector,
+        nextButtonContainer: LOCAL_CONFIG.nextButtonContainerSelector,
+        processingIndicator: LOCAL_CONFIG.processingIndicatorSelector,
+        doctorName: LOCAL_CONFIG.doctorNameSelector,
+        specialty: LOCAL_CONFIG.specialtySelector,
+        contactLinks: LOCAL_CONFIG.contactLinksSelector,
+        tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr'
+    },
+    CRAWLER: {
+        maxRequestsPerCrawl: process.env.MAX_REQUESTS ? parseInt(process.env.MAX_REQUESTS) : input.maxRequestsPerCrawl,
+        headless: input.headless !== undefined ? input.headless : LOCAL_CONFIG.headless,
+        timeout: LOCAL_CONFIG.timeout,
+        maxRetries: LOCAL_CONFIG.maxRetries,
+        browserRestartCount: LOCAL_CONFIG.browserRestartCount,
+        requestInterval: LOCAL_CONFIG.requestInterval,
+        pageInterval: LOCAL_CONFIG.pageInterval,
+        retryInterval: LOCAL_CONFIG.retryInterval,
+        entityInterval: LOCAL_CONFIG.entityInterval,
+        userAgent: LOCAL_CONFIG.userAgent,
+        labels: {
+            DETAIL: 'DETAIL',
+            SPECIALISTS_LIST: 'SPECIALISTS_LIST'
+        }
+    },
     OUTPUT: {
         getFilename: () => {
-            if (input.outputFilename && input.outputFilename.trim() !== '') {
-                return input.outputFilename.endsWith('.json') ? input.outputFilename : `${input.outputFilename}.json`;
+            // Use input filename if provided, otherwise use local config, otherwise use default
+            const customFilename = input.outputFilename && input.outputFilename.trim() !== '' ? 
+                input.outputFilename : 
+                (LOCAL_CONFIG.outputFilename && LOCAL_CONFIG.outputFilename.trim() !== '' ? 
+                    LOCAL_CONFIG.outputFilename : null);
+                    
+            if (customFilename) {
+                return customFilename.endsWith('.json') ? customFilename : `${customFilename}.json`;
             }
-            return BASE_CONFIG.OUTPUT.getFilename();
+            
+            const today = new Date().toISOString().split('T')[0];
+            return `opengovsg-scraped-data-${today}.json`;
         }
-    }
+    },
+    COOKIES: input.cookies && input.cookies.length > 0 ? input.cookies : (LOCAL_CONFIG.cookies || []),
 };
 
 console.log('Starting crawler with configuration:', {
     environment: isApify ? 'Apify' : 'Local',
     siteName: CONFIG.SITE.name,
     startUrl: CONFIG.SITE.startUrl,
-    outputFilename: CONFIG.OUTPUT.getFilename(),
     maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl === -1 ? 'unlimited' : CONFIG.CRAWLER.maxRequestsPerCrawl,
     headless: CONFIG.CRAWLER.headless
 });
 
-// Array to store all extracted data (for regular crawler)
+// Array to store all extracted data
 let extractedData = [];
 
 // Create backup of existing file if needed
@@ -119,537 +393,295 @@ const crawler = new PlaywrightCrawler({
             headless: CONFIG.CRAWLER.headless,
             ignoreHTTPSErrors: true,
             args: [
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor',
+                '--disable-dev-shm-usage',
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
                 '--disable-gpu',
-                '--disable-features=VizDisplayCompositor',
                 '--disable-background-timer-throttling',
                 '--disable-backgrounding-occluded-windows',
                 '--disable-renderer-backgrounding',
-                '--disable-field-trial-config',
-                '--disable-back-forward-cache',
-                '--disable-ipc-flooding-protection',
-                '--disable-hang-monitor',
-                '--disable-prompt-on-repost',
-                '--disable-sync',
-                '--disable-translate',
-                '--disable-windows10-custom-titlebar',
-                '--disable-features=TranslateUI',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-web-security',
-                '--allow-running-insecure-content',
-                '--disable-features=VizDisplayCompositor',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--disable-ipc-flooding-protection',
-                '--disable-renderer-backgrounding',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-client-side-phishing-detection',
-                '--disable-sync-preferences',
-                '--disable-default-apps',
-                '--disable-component-extensions-with-background-pages',
                 '--disable-background-networking',
-                '--disable-component-update',
-                '--disable-domain-reliability',
-                '--disable-features=AudioServiceOutOfProcess',
+                '--disable-background-sync',
+                '--disable-device-discovery-notifications',
                 '--disable-hang-monitor',
-                '--disable-prompt-on-repost',
-                '--disable-sync',
-                '--disable-translate',
-                '--disable-windows10-custom-titlebar',
-                '--disable-features=TranslateUI',
+                '--disable-component-update',
+                '--disable-blink-features=AutomationControlled',
                 '--disable-extensions',
                 '--disable-plugins',
-                '--disable-web-security',
-                '--allow-running-insecure-content',
-                '--disable-features=VizDisplayCompositor',
-                '--exclude-switches=enable-automation',
-                '--disable-automation',
-                '--disable-dev-tools',
+                '--disable-images',
+                '--enable-automation',
+                '--disable-default-apps',
+                '--disable-sync',
+                '--metrics-recording-only',
+                '--mute-audio',
                 '--no-default-browser-check',
-                '--no-pings',
+                '--no-first-run',
+                '--safebrowsing-disable-auto-update',
                 '--password-store=basic',
                 '--use-mock-keychain',
-                '--disable-component-extensions-with-background-pages',
-                '--disable-background-networking',
-                '--disable-component-update',
-                '--disable-domain-reliability',
-                '--disable-features=AudioServiceOutOfProcess',
-                '--disable-hang-monitor',
-                '--disable-prompt-on-repost',
-                '--disable-sync',
-                '--disable-translate',
-                '--disable-windows10-custom-titlebar',
+                '--memory-pressure-off',
+                '--max_old_space_size=2048',
+                '--disable-ipc-flooding-protection',
                 '--disable-features=TranslateUI',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-web-security',
-                '--allow-running-insecure-content',
-                '--disable-features=VizDisplayCompositor',
-                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                '--disable-client-side-phishing-detection',
+                '--disable-popup-blocking',
+                '--disable-prompt-on-repost',
+                '--no-crash-upload',
+                '--disable-breakpad',
+                `--user-agent=${CONFIG.CRAWLER.userAgent}`
             ]
         }
     },
-    // Add pre-navigation handler to set cookies and stealth mode
-    preNavigationHooks: [
-        async ({ page, request }) => {
-            // Randomly select user agent and generate realistic configuration
-            const randomUserAgent = CONFIG.USER_AGENTS[Math.floor(Math.random() * CONFIG.USER_AGENTS.length)];
-            const viewport = getRandomViewport();
-            const hardware = getHardwareInfo();
-            const screenProps = getScreenProperties(viewport);
-            const connection = getConnectionInfo();
-            const battery = getBatteryInfo();
-            const webgl = getWebGLInfo();
-            const mediaDevices = getMediaDevices();
-            
-            // Set realistic viewport
-            await page.setViewportSize(viewport);
-            
-            // Set realistic headers based on user agent
-            const headers = getRealisticHeaders(randomUserAgent);
-            await page.setExtraHTTPHeaders(headers);
-
-            // User agent is already set in launch options and HTTP headers
-
-            // Set cookies before navigation if we have any
-            if (playwrightCookies.length > 0) {
-                try {
-                    await page.context().addCookies(playwrightCookies);
-                    console.log(`🍪 Applied ${playwrightCookies.length} cookies to page context`);
-                } catch (error) {
-                    console.warn(`⚠️ Failed to set some cookies: ${error.message}`);
-                }
-            }
-
-            // Add comprehensive stealth mode scripts with dynamic values
-            await page.addInitScript(({ 
-                userAgent, 
-                viewport, 
-                hardware, 
-                screenProps, 
-                connection, 
-                battery, 
-                webgl, 
-                mediaDevices,
-                chromeLoadTimes,
-                chromeCSI
-            }) => {
-                // Remove webdriver property completely
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined,
-                });
-
-                // Remove automation indicators
-                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
-                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
-                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
-
-                // Mock realistic plugins
-                Object.defineProperty(navigator, 'plugins', {
-                    get: () => {
-                        const plugins = [
-                            {
-                                0: { type: "application/x-google-chrome-pdf", suffixes: "pdf", description: "Portable Document Format", enabledPlugin: Plugin },
-                                description: "Portable Document Format",
-                                filename: "internal-pdf-viewer",
-                                length: 1,
-                                name: "Chrome PDF Plugin"
-                            },
-                            {
-                                0: { type: "application/pdf", suffixes: "pdf", description: "", enabledPlugin: Plugin },
-                                description: "",
-                                filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai",
-                                length: 1,
-                                name: "Chrome PDF Viewer"
-                            },
-                            {
-                                0: { type: "application/x-nacl", suffixes: "", description: "Native Client Executable", enabledPlugin: Plugin },
-                                1: { type: "application/x-pnacl", suffixes: "", description: "Portable Native Client Executable", enabledPlugin: Plugin },
-                                description: "",
-                                filename: "internal-nacl-plugin",
-                                length: 2,
-                                name: "Native Client"
-                            }
-                        ];
-                        return plugins;
-                    },
-                });
-
-                // Mock realistic languages
-                Object.defineProperty(navigator, 'languages', {
-                    get: () => ['en-US', 'en'],
-                });
-
-                // Mock hardware concurrency
-                Object.defineProperty(navigator, 'hardwareConcurrency', {
-                    get: () => hardware.cores,
-                });
-
-                // Mock device memory
-                Object.defineProperty(navigator, 'deviceMemory', {
-                    get: () => hardware.memory,
-                });
-
-                // Mock platform
-                Object.defineProperty(navigator, 'platform', {
-                    get: () => hardware.platform,
-                });
-
-                // Mock permissions API
-                const originalQuery = window.navigator.permissions.query;
-                window.navigator.permissions.query = (parameters) => (
-                    parameters.name === 'notifications' ?
-                        Promise.resolve({ state: Notification.permission }) :
-                        originalQuery(parameters)
-                );
-
-                // Mock chrome object with realistic properties
-                
-                window.chrome = {
-                    runtime: {
-                        onConnect: undefined,
-                        onMessage: undefined,
-                    },
-                    loadTimes: function() {
-                        return chromeLoadTimes;
-                    },
-                    csi: function() {
-                        return chromeCSI;
-                    }
-                };
-
-                // Mock realistic screen properties
-                Object.defineProperty(screen, 'availTop', { get: () => screenProps.availTop });
-                Object.defineProperty(screen, 'availLeft', { get: () => screenProps.availLeft });
-                Object.defineProperty(screen, 'availWidth', { get: () => screenProps.availWidth });
-                Object.defineProperty(screen, 'availHeight', { get: () => screenProps.availHeight });
-                Object.defineProperty(screen, 'colorDepth', { get: () => screenProps.colorDepth });
-                Object.defineProperty(screen, 'pixelDepth', { get: () => screenProps.pixelDepth });
-                Object.defineProperty(screen, 'width', { get: () => screenProps.width });
-                Object.defineProperty(screen, 'height', { get: () => screenProps.height });
-
-                // Mock battery API
-                Object.defineProperty(navigator, 'getBattery', {
-                    get: () => () => Promise.resolve(battery)
-                });
-
-                // Mock connection API
-                Object.defineProperty(navigator, 'connection', {
-                    get: () => connection
-                });
-
-                // Mock media devices
-                Object.defineProperty(navigator, 'mediaDevices', {
-                    get: () => ({
-                        enumerateDevices: () => Promise.resolve(mediaDevices)
-                    })
-                });
-
-                // Override Date.prototype.getTimezoneOffset to return realistic timezone
-                const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
-                Date.prototype.getTimezoneOffset = function() {
-                    return -480; // UTC+8 (Singapore timezone)
-                };
-
-                // Mock WebGL to avoid fingerprinting
-                const getParameter = WebGLRenderingContext.prototype.getParameter;
-                WebGLRenderingContext.prototype.getParameter = function(parameter) {
-                    if (parameter === 37445) {
-                        return webgl.vendor;
-                    }
-                    if (parameter === 37446) {
-                        return webgl.renderer;
-                    }
-                    return getParameter(parameter);
-                };
-
-                // Mock canvas fingerprinting
-                const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
-                HTMLCanvasElement.prototype.toDataURL = function() {
-                    const context = this.getContext('2d');
-                    if (context) {
-                        const imageData = context.getImageData(0, 0, this.width, this.height);
-                        for (let i = 0; i < imageData.data.length; i += 4) {
-                            imageData.data[i] = imageData.data[i] ^ 1;
-                            imageData.data[i + 1] = imageData.data[i + 1] ^ 1;
-                            imageData.data[i + 2] = imageData.data[i + 2] ^ 1;
-                        }
-                        context.putImageData(imageData, 0, 0);
-                    }
-                    return originalToDataURL.apply(this, arguments);
-                };
-
-                // Mock WebRTC to prevent IP leakage
-                const originalCreateDataChannel = RTCPeerConnection.prototype.createDataChannel;
-                RTCPeerConnection.prototype.createDataChannel = function() {
-                    return originalCreateDataChannel.apply(this, arguments);
-                };
-
-                // Override getClientRects to avoid detection
-                const originalGetClientRects = Element.prototype.getClientRects;
-                Element.prototype.getClientRects = function() {
-                    const rects = originalGetClientRects.call(this);
-                    return Array.from(rects).map(rect => ({
-                        ...rect,
-                        top: rect.top + Math.random() * 0.1,
-                        left: rect.left + Math.random() * 0.1,
-                        bottom: rect.bottom + Math.random() * 0.1,
-                        right: rect.right + Math.random() * 0.1
-                    }));
-                };
-
-                // Mock realistic timing
-                const originalNow = performance.now;
-                performance.now = function() {
-                    return originalNow.call(this) + Math.random() * 0.1;
-                };
-
-                // Remove automation traces
-                delete window.__nightmare;
-                delete window._phantom;
-                delete window.callPhantom;
-                delete window._selenium;
-                delete window.__selenium_unwrapped;
-                delete window.__webdriver_evaluate;
-                delete window.__webdriver_script_func;
-                delete window.__webdriver_script_fn;
-                delete window.__fxdriver_evaluate;
-                delete window.__driver_unwrapped;
-                delete window.__webdriver_unwrapped;
-                delete window.__driver_evaluate;
-                delete window.__selenium_evaluate;
-                delete window.__webdriver_script_function;
-            }, {
-                userAgent: randomUserAgent,
-                viewport: viewport,
-                hardware: hardware,
-                screenProps: screenProps,
-                connection: connection,
-                battery: battery,
-                webgl: webgl,
-                mediaDevices: mediaDevices,
-                chromeLoadTimes: getChromeLoadTimes(),
-                chromeCSI: getChromeCSI()
-            });
-        }
-    ],
-    // Session pool options
+    // Set lower concurrency to be respectful and stable
+    maxConcurrency: 1,
+    minConcurrency: 1,
+    // Browser pool options for stability
+    browserPoolOptions: {
+        useFingerprints: false,
+        maxOpenPagesPerBrowser: 1, // Only one page per browser to prevent resource conflicts
+        retireBrowserAfterPageCount: LOCAL_CONFIG.browserRestartCount || 3, // Restart browser every N pages to prevent memory leaks
+    },
+    // Handle session pool configuration
     sessionPoolOptions: {
         blockedStatusCodes: [], // Don't auto-block any status codes (including 403, 503)
         maxPoolSize: 1,
         sessionOptions: {
             maxErrorScore: 15, // Higher tolerance for "errors" 
             errorScoreDecrement: 0.3, // Slower error recovery
-            maxAgeSecs: 1800, // 30 minutes session lifetime
         }
     },
-    // Add delays between requests to avoid being detected as a bot
-    requestHandlerTimeoutSecs: 90,
-    navigationTimeoutSecs: 45,
-    // Add random delays between requests
-    minConcurrency: 1,
-    maxConcurrency: 1,
-    // Enhanced proxy support with rotation
-    proxyConfiguration: (() => {
-        // Check if Apify proxy is available
-        if (process.env.APIFY_PROXY_GROUPS) {
-            return {
-                useApifyProxy: true,
-                apifyProxyGroups: process.env.APIFY_PROXY_GROUPS.split(','),
-                apifyProxyCountry: process.env.APIFY_PROXY_COUNTRY || CONFIG.PROXY.countries[0],
-                apifyProxySessionRotationProbability: 0.3, // 30% chance to rotate session
-                apifyProxyMaxUsedSessions: CONFIG.PROXY.sessionPoolSize
-            };
-        }
-        
-        // Check if local proxy configuration is enabled
-        if (CONFIG.PROXY.enabled) {
-            return {
-                useApifyProxy: false,
-                // Add custom proxy configuration here if needed
-                // proxyUrls: ['http://proxy1:port', 'http://proxy2:port']
-            };
-        }
-        
-        return undefined;
-    })(),
-    // Handle failed requests with better retry logic
+    // Increase timeouts to prevent premature closures (increased for fresh browser approach)
+    requestHandlerTimeoutSecs: 3600, // 1 hour for the main handler (to handle all 1100+ entities)
+    navigationTimeoutSecs: 180, // 3 minutes for navigation
+    // Handle failed requests
     failedRequestHandler: async ({ request, error }) => {
         console.error(`❌ Request failed: ${error.message}`);
-        
-        // Check if it's a network error that might be temporary
-        if (error.message.includes('net::ERR_HTTP_RESPONSE_CODE_FAILURE') || 
-            error.message.includes('net::ERR_CONNECTION_REFUSED') ||
-            error.message.includes('net::ERR_TIMED_OUT')) {
-            
-            console.log(`🔄 Retrying request after delay: ${request.url}`);
-            
-            // Add exponential backoff delay
-            const retryDelay = Math.min(30000, Math.pow(2, request.retryCount || 0) * 5000);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            
-            // Re-enqueue the request for retry
-            return request;
-        }
-        
-        // For other errors, don't retry
-        console.log(`❌ Giving up on request after ${request.retryCount || 0} retries: ${request.url}`);
     },
     requestHandler: async ({ page, request, enqueueLinks }) => {
-        // Add random delay between 3-8 seconds to mimic human behavior
-        const delay = Math.random() * 5000 + 3000;
+        // Add random delay between 2-5 seconds to mimic human behavior
+        const delay = Math.random() * 3000 + 2000;
         console.log(`⏱️ Waiting ${Math.round(delay)}ms before processing request`);
-        await page.waitForTimeout(delay);
+        await safeWaitForTimeout(page, delay);
         console.log(`Processing: ${request.url}`);
-
-        // Add realistic human behavior simulation
-        try {
-            const viewport = page.viewportSize();
-            const centerX = viewport.width / 2;
-            const centerY = viewport.height / 2;
-            
-            // Generate realistic mouse movement path
-            const endX = centerX + (Math.random() - 0.5) * 200;
-            const endY = centerY + (Math.random() - 0.5) * 200;
-            const mousePath = generateMousePath(centerX, centerY, endX, endY);
-            
-            // Move mouse along the path
-            for (const point of mousePath) {
-                await page.mouse.move(point.x, point.y);
-                await page.waitForTimeout(getTypingDelay() / 2);
-            }
-            
-            // Simulate reading behavior - scroll with realistic behavior
-            const scrollBehavior = getScrollBehavior();
-            if (scrollBehavior.smooth) {
-                await page.mouse.wheel(0, scrollBehavior.distance);
-                await page.waitForTimeout(scrollBehavior.duration);
-            }
-            
-            // Random click simulation (sometimes)
-            if (Math.random() < 0.3) {
-                const clickX = centerX + (Math.random() - 0.5) * 100;
-                const clickY = centerY + (Math.random() - 0.5) * 100;
-                await page.mouse.click(clickX, clickY);
-                await page.waitForTimeout(getTypingDelay());
-            }
-            
-            // Simulate keyboard activity with realistic timing
-            if (Math.random() < 0.2) {
-                const keys = ['Tab', 'ArrowDown', 'ArrowUp', 'Space', 'Escape'];
-                const randomKey = keys[Math.floor(Math.random() * keys.length)];
-                await page.keyboard.press(randomKey);
-                await page.waitForTimeout(getTypingDelay());
-            }
-            
-            // Simulate realistic page interaction patterns
-            if (Math.random() < 0.4) {
-                // Random scroll to simulate reading
-                const scrollAmount = Math.random() * 200 + 100;
-                await page.mouse.wheel(0, scrollAmount);
-                await page.waitForTimeout(Math.random() * 1000 + 500);
-            }
-            
-        } catch (error) {
-            // Ignore mouse/keyboard simulation errors
-        }
         
+        // This is the main entry point - start sequential processing
+        console.log('Starting sequential corporate entity extraction');
+        console.log(`Looking for selector: ${CONFIG.SELECTORS.specialistLinks}`);
         
-        // Temporarily disable URL filtering for debugging
-        // if (!shouldCrawlUrl(request.url, CONFIG.SITE)) {
-        //     console.log(`Skipping URL outside allowed patterns: ${request.url}`);
-        //     return;
-        // }
+        let currentPage = 1;
+        let hasMorePages = true;
         
-        if (request.label === CONFIG.CRAWLER.labels.DETAIL) {
-            // Extract specialist data from detail page
-            const specialistData = await extractSpecialistData(page, request.url, CONFIG);
-            extractedData.push(specialistData);
-            
-        } else if (request.label === CONFIG.CRAWLER.labels.SPECIALISTS_LIST) {
-            // We are on a specialists listing page (page 2, 3, etc.)
-            console.log(`Processing specialists listing page: ${request.url}`);
-            
-            // Wait for the specialists content to load
-            await page.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
-            
-            // Enqueue all specialist profile links (debugging - no filtering)
-            await enqueueLinks({
-                selector: CONFIG.SELECTORS.specialistLinks,
-                label: CONFIG.CRAWLER.labels.DETAIL,
-                // transformRequestFunction: (req) => {
-                //     // Filter URLs before adding to queue
-                //     if (!shouldCrawlUrl(req.url, CONFIG.SITE)) {
-                //         console.log(`Filtered out URL: ${req.url}`);
-                //         return false; // Don't add to queue
-                //     }
-                //     return req;
-                // }
-            });
-            
-            // Handle pagination to next page
-            await handlePagination(page, request.url, enqueueLinks, CONFIG);
-            
-        } else {
-            // This is the initial page load
-            console.log('Starting on specialists page');
-            console.log(`Looking for selector: ${CONFIG.SELECTORS.specialistLinks}`);
+        while (hasMorePages) {
+            console.log(`\n🔄 ==================== PROCESSING PAGE ${currentPage} ====================`);
             
             try {
-                // Wait for the specialists content to load
-                await page.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
-                console.log('✅ Specialist links selector found!');
+                // Use fresh browser to get entity links for current page
+                let currentPageUrl;
+                if (currentPage === 1) {
+                    currentPageUrl = LOCAL_CONFIG.paginationBaseUrl || CONFIG.SITE.startUrl;
+                } else {
+                    // Construct proper page URL using the pagination base URL
+                    const baseUrl = LOCAL_CONFIG.paginationBaseUrl || CONFIG.SITE.startUrl.replace(/[?&]page=\d+/, '');
+                    const separator = baseUrl.includes('?') ? '&' : '?';
+                    currentPageUrl = `${baseUrl}${separator}page=${currentPage}`;
+                }
+                
+                let listingBrowser = null;
+                let listingPage = null;
+                let entityLinks = [];
+                
+                try {
+                    console.log(`🆕 Creating fresh browser for page ${currentPage}: ${currentPageUrl}`);
+                    listingBrowser = await chromium.launch({
+                        headless: LOCAL_CONFIG?.headless !== false,
+                        args: [
+                            '--no-sandbox',
+                            '--disable-setuid-sandbox',
+                            '--disable-dev-shm-usage',
+                            '--memory-pressure-off',
+                            '--disable-web-security', // Help prevent ad interference
+                            '--disable-features=VizDisplayCompositor' // Reduce ad rendering issues
+                        ]
+                    });
+                    
+                    listingPage = await listingBrowser.newPage();
+                    listingPage.setDefaultTimeout(LOCAL_CONFIG?.timeout || 30000);
+                    
+                    // Block ads and trackers to prevent interference
+                    await listingPage.route('**/*', (route) => {
+                        const url = route.request().url();
+                        if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication'))) {
+                            route.abort();
+                        } else {
+                            route.continue();
+                        }
+                    });
+                    
+                    await listingPage.goto(currentPageUrl, { waitUntil: 'networkidle' });
+                    await listingPage.waitForTimeout(2000);
+                    
+                    // Wait for the entity links to load
+                    await listingPage.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
+                    console.log(`✅ Entity links found on page ${currentPage}!`);
+                    
+                    // Get all entity links on current page
+                    entityLinks = await listingPage.evaluate((selector) => {
+                        const links = document.querySelectorAll(selector);
+                        return Array.from(links).map(link => link.href).filter(href => href);
+                    }, CONFIG.SELECTORS.specialistLinks);
+                    
+                } finally {
+                    // Don't close the listing browser yet - we need it for pagination
+                    console.log(`📝 Keeping listing browser open for pagination check`);
+                }
+                
+                console.log(`Found ${entityLinks.length} entities on page ${currentPage}`);
+                console.log(`🚀 Starting to process all ${entityLinks.length} entities from page ${currentPage}`);
+                
+                // Process each entity using fresh browser instances (eliminates ALL browser failures)
+                for (let i = 0; i < entityLinks.length; i++) {
+                    const entityUrl = entityLinks[i];
+                    console.log(`\n📋 Processing entity ${i + 1}/${entityLinks.length} on page ${currentPage}`);
+                    
+                    // Add interval between requests to prevent overwhelming the server
+                    if (i > 0) {
+                        const interval = LOCAL_CONFIG.requestInterval || 5000;
+                        console.log(`⏳ Waiting ${interval}ms before processing next entity...`);
+                        await new Promise(resolve => setTimeout(resolve, interval));
+                    }
+                    
+                    // Extract data using fresh browser instance (eliminates all browser persistence issues)
+                    const result = await extractEntityWithFreshBrowser(entityUrl, CONFIG);
+                    
+                    // Add the data to our collection
+                    extractedData.push(result.data);
+                    
+                    // Save data after each extraction (incremental save)
+                    await saveDataToFile(extractedData, CONFIG);
+                    
+                    if (result.success) {
+                        console.log(`✅ Successfully completed entity ${i + 1}/${entityLinks.length}: ${result.data.entityName}`);
+                    } else {
+                        console.log(`⚠️ Failed entity ${i + 1}/${entityLinks.length}: ${entityUrl} (saved as error entry)`);
+                    }
+                    
+                    // Brief pause after each entity to be respectful to server
+                    const entityInterval = LOCAL_CONFIG.entityInterval || 3000;
+                    console.log(`⏳ Waiting ${entityInterval}ms after entity processing...`);
+                    await new Promise(resolve => setTimeout(resolve, entityInterval));
+                }
+                
+                console.log(`✅ Completed all ${entityLinks.length} entities on page ${currentPage}`);
+                
+                // Check for next page button and click it
+                console.log(`🔍 Looking for next page button after completing page ${currentPage}...`);
+                
+                try {
+                    // Look for the next button using the nextButtonSelector
+                    const nextButtonSelector = LOCAL_CONFIG.nextButtonSelector;
+                    console.log(`🔍 Looking for next button with selector: ${nextButtonSelector}`);
+                    
+                    const nextButton = await listingPage.$(nextButtonSelector);
+                    
+                    if (nextButton) {
+                        // Check the text content of the next button
+                        const buttonText = await listingPage.evaluate((button) => {
+                            return button.textContent.trim();
+                        }, nextButton);
+                        
+                        console.log(`🔍 Next button text: "${buttonText}"`);
+                        
+                        // If button text is NOT "Next Page", we've reached the last page
+                        if (buttonText !== "Next Page") {
+                            console.log(`🏁 Button text is "${buttonText}" (not "Next Page") - this is the last page of pagination`);
+                            console.log(`✅ Scraping completed! Successfully processed ${currentPage} pages total.`);
+                            hasMorePages = false;
+                            break; // Exit the pagination loop completely
+                        }
+                        
+                        // Button text IS "Next Page", so more pages are available
+                        console.log(`✅ Button text is "Next Page" - more pages available, proceeding to next page...`);
+                        
+                        // Also check if the next button is disabled
+                        const isDisabled = await listingPage.evaluate((button) => {
+                            const parentLi = button.closest('li');
+                            return button.disabled || 
+                                   button.classList.contains('disabled') || 
+                                   (parentLi && parentLi.classList.contains('disabled')) ||
+                                   button.getAttribute('aria-disabled') === 'true';
+                        }, nextButton);
+                        
+                        if (isDisabled) {
+                            console.log(`📄 Next button is disabled - reached end of pagination at page ${currentPage}`);
+                            hasMorePages = false;
+                            continue;
+                        }
+                        
+                        console.log(`🖱️ Found "Next Page" button - navigating to next page ${currentPage + 1}`);
+                        
+                        // Extract href and navigate directly (more reliable than clicking)
+                        const nextPageUrl = await listingPage.evaluate((selector) => {
+                            const button = document.querySelector(selector);
+                            return button ? button.href : null;
+                        }, nextButtonSelector);
+                        
+                        if (nextPageUrl) {
+                            console.log(`🌐 Navigating directly to: ${nextPageUrl}`);
+                            await listingPage.goto(nextPageUrl, { waitUntil: 'load', timeout: 60000 });
+                            currentPage++;
+                            console.log(`✅ Successfully navigated to page ${currentPage}`);
+                            
+                            // Wait a bit for the page to fully load
+                            const pageInterval = LOCAL_CONFIG.pageInterval || 10000;
+                            console.log(`⏳ Waiting ${pageInterval}ms for page ${currentPage} to fully load...`);
+                            await new Promise(resolve => setTimeout(resolve, pageInterval));
+                            
+                            // Continue to next iteration to process the new page
+                            continue;
+                        } else {
+                            console.log(`❌ Could not extract next page URL from button`);
+                            hasMorePages = false;
+                            break;
+                        }
+                        
+                    } else {
+                        console.log(`🏁 No next button found - this is the last page of pagination`);
+                        console.log(`✅ Scraping completed! Successfully processed ${currentPage} pages total.`);
+                        hasMorePages = false;
+                        break; // Exit the pagination loop completely
+                    }
+                    
+                } catch (nextButtonError) {
+                    console.log(`❌ Error clicking next button: ${nextButtonError.message}`);
+                    hasMorePages = false;
+                    continue;
+                } finally {
+                    // Clean up listing browser after pagination check
+                    try {
+                        if (listingPage) await listingPage.close();
+                        if (listingBrowser) await listingBrowser.close();
+                        console.log(`🧹 Cleaned up listing browser after pagination check`);
+                    } catch (cleanupError) {
+                        console.warn(`⚠️ Cleanup warning for listing browser:`, cleanupError.message);
+                    }
+                }
+                
             } catch (error) {
-                console.log('❌ Specialist links selector NOT found. Trying to find what IS on the page...');
-                
-                // Debug: Check what's actually on the page
-                const pageContent = await page.evaluate(() => {
-                    return {
-                        title: document.title,
-                        url: window.location.href,
-                        bodyText: document.body ? document.body.innerText.substring(0, 500) : 'No body',
-                        linkCount: document.querySelectorAll('a').length,
-                        divCount: document.querySelectorAll('div').length
-                    };
-                });
-                console.log('Page content:', pageContent);
-                
-                // Try to find any links that might be specialist links
-                const allLinks = await page.evaluate(() => {
-                    const links = Array.from(document.querySelectorAll('a'));
-                    return links.slice(0, 10).map(link => ({
-                        text: link.textContent.trim(),
-                        href: link.href,
-                        className: link.className
-                    }));
-                });
-                console.log('First 10 links on page:', allLinks);
-                
-                throw error;
+                console.log(`❌ Error on page ${currentPage}:`, error.message);
+                hasMorePages = false;
             }
-            
-            // Enqueue all specialist profile links from the first page (debugging - no filtering)
-            await enqueueLinks({
-                selector: CONFIG.SELECTORS.specialistLinks,
-                label: CONFIG.CRAWLER.labels.DETAIL,
-                // transformRequestFunction: (req) => {
-                //     // Filter URLs before adding to queue
-                //     if (!shouldCrawlUrl(req.url, CONFIG.SITE)) {
-                //         console.log(`Filtered out URL: ${req.url}`);
-                //         return false; // Don't add to queue
-                //     }
-                //     return req;
-                // }
-            });
-            
-            // Handle pagination for the first page
-            await handleInitialPagination(page, enqueueLinks, CONFIG);
+        }
+        
+        console.log(`✅ Completed processing all pages. Total pages processed: ${currentPage}`);
+        console.log(`📊 Total entities extracted: ${extractedData.length}`);
+        
+        // Calculate expected vs actual
+        if (currentPage >= 11) {
+            console.log(`🎯 Successfully reached expected 11+ pages of pagination!`);
+        } else {
+            console.log(`⚠️ Only processed ${currentPage} pages - expected 11 pages`);
         }
     },
     maxRequestsPerCrawl: CONFIG.CRAWLER.maxRequestsPerCrawl === -1 ? undefined : CONFIG.CRAWLER.maxRequestsPerCrawl,
@@ -664,7 +696,7 @@ const outputPath = await saveDataToFile(extractedData, CONFIG, CONFIG.COOKIES);
 // Handle data output based on environment
 await handleDataOutput(extractedData, CONFIG, Actor, isApify, CONFIG.COOKIES);
 
-console.log(`✅ Crawling completed! Found ${extractedData.length} specialists.`);
+console.log(`✅ Crawling completed! Found ${extractedData.length} entities.`);
 console.log(`📁 Data saved to: ${outputPath}`);
 
 // Handle exit based on environment

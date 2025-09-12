@@ -5,6 +5,77 @@
 import { shouldCrawlUrl } from '../utils/helpers.js';
 
 /**
+ * Handle AJAX pagination by clicking next button and waiting for content to load
+ * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
+ * @returns {Promise<boolean>} True if next page was successfully loaded
+ */
+export async function handleAjaxPagination(page, config) {
+    try {
+        console.log('Checking for AJAX next button...');
+        
+        // Check if next button exists and is not disabled
+        const nextButton = await page.$(config.SELECTORS.nextButton);
+        if (!nextButton) {
+            console.log('No next button found');
+            return false;
+        }
+        
+        // Check if button is disabled
+        const isDisabled = await page.evaluate((selector) => {
+            const btn = document.querySelector(selector);
+            return btn ? (btn.disabled || btn.classList.contains('disabled') || btn.getAttribute('disabled') !== null) : true;
+        }, config.SELECTORS.nextButton);
+        
+        if (isDisabled) {
+            console.log('Next button is disabled - no more pages');
+            return false;
+        }
+        
+        console.log('Clicking next button for AJAX pagination...');
+        
+        // Click the next button
+        await nextButton.click();
+        
+        // Wait for processing class to appear on body (indicates AJAX request started)
+        console.log('Waiting for processing class to appear...');
+        try {
+            await page.waitForSelector(config.SELECTORS.processingIndicator, { 
+                timeout: 5000,
+                state: 'attached'
+            });
+            console.log('Processing class detected - AJAX request started');
+        } catch (error) {
+            console.log('Processing class not detected, but continuing...');
+        }
+        
+        // Wait for processing class to be removed (indicates AJAX request completed)
+        console.log('Waiting for processing class to be removed...');
+        try {
+            await page.waitForSelector(config.SELECTORS.processingIndicator, { 
+                timeout: 30000,
+                state: 'detached'
+            });
+            console.log('Processing class removed - AJAX request completed');
+        } catch (error) {
+            console.log('Processing class removal not detected, waiting for timeout...');
+            // Fallback: wait for a reasonable time
+            await page.waitForTimeout(3000);
+        }
+        
+        // Additional wait to ensure content is fully loaded
+        await page.waitForTimeout(2000);
+        
+        console.log('AJAX pagination completed successfully');
+        return true;
+        
+    } catch (error) {
+        console.error('Error during AJAX pagination:', error);
+        return false;
+    }
+}
+
+/**
  * Check if next button exists and is not disabled
  * @param {Page} page - Playwright page object
  * @param {Object} config - Configuration object
@@ -93,6 +164,9 @@ export function getNextPageUrl(currentUrl, config) {
             // Remove trailing slash from base URL if it exists
             const cleanBaseUrl = baseUrl.replace(/\/$/, '');
             nextPageUrl = cleanBaseUrl + pathPattern;
+        } else if (paginationConfig.type === 'ajax') {
+            // AJAX pagination doesn't use URL generation - this should not be called for AJAX
+            throw new Error(`getNextPageUrl should not be called for AJAX pagination type. Use handleAjaxPagination instead.`);
         } else {
             throw new Error(`Unsupported pagination type: ${paginationConfig.type}`);
         }
@@ -163,6 +237,9 @@ export function getPageUrl(pageNumber, config) {
             // Remove trailing slash from base URL if it exists
             const cleanBaseUrl = baseUrl.replace(/\/$/, '');
             return cleanBaseUrl + pathPattern;
+        } else if (paginationConfig.type === 'ajax') {
+            // AJAX pagination doesn't use URL generation - this should not be called for AJAX
+            throw new Error(`getPageUrl should not be called for AJAX pagination type. Use handleAjaxPagination instead.`);
         } else {
             throw new Error(`Unsupported pagination type: ${paginationConfig.type}`);
         }
@@ -180,6 +257,12 @@ export function getPageUrl(pageNumber, config) {
  * @returns {Promise<boolean>} True if page 2 was enqueued
  */
 export async function handleInitialPagination(page, enqueueLinks, config) {
+    // For AJAX pagination, we shouldn't be generating URLs
+    if (config.SITE.pagination.type === 'ajax') {
+        console.log('AJAX pagination detected - handleInitialPagination should not be used for AJAX. Use handleAjaxPagination instead.');
+        return false;
+    }
+    
     const hasNext = await hasNextPage(page, config);
     
     if (hasNext) {

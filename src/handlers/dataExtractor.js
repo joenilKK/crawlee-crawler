@@ -12,14 +12,22 @@ export async function extractDoctorName(page, config) {
     try {
         await page.waitForSelector(config.SELECTORS.doctorName, { timeout: config.CRAWLER.timeout });
         
-        const doctorName = await page.evaluate((selector) => {
+        const entityName = await page.evaluate((selector) => {
             const nameElement = document.querySelector(selector);
-            return nameElement ? nameElement.textContent.trim() : 'Name not found';
+            if (nameElement) {
+                // Clean up the text - remove any <small> tags or line breaks
+                let text = nameElement.textContent.trim();
+                // Remove any trailing newlines or extra whitespace
+                text = text.replace(/\s+/g, ' ').trim();
+                return text;
+            }
+            return 'Name not found';
         }, config.SELECTORS.doctorName);
         
-        return doctorName;
+        console.log(`Extracted entity name: ${entityName}`);
+        return entityName;
     } catch (error) {
-        console.error('Error extracting doctor name:', error);
+        console.error('Error extracting entity name:', error);
         return 'Name extraction failed';
     }
 }
@@ -36,11 +44,13 @@ export async function extractTableData(page, config) {
             const tableRows = document.querySelectorAll(selector);
             const businessOverview = [];
             
-            tableRows.forEach(row => {
+            tableRows.forEach((row, index) => {
                 const cells = row.querySelectorAll('td');
+                
                 if (cells.length >= 2) {
                     const key = cells[0].textContent.trim();
                     const value = cells[1].textContent.trim();
+                    
                     if (key && value) {
                         businessOverview.push({
                             key: key,
@@ -53,6 +63,7 @@ export async function extractTableData(page, config) {
             return businessOverview;
         }, config.SELECTORS.tableRows);
         
+        console.log(`Table extraction completed. Found ${tableData.length} overview items for entity.`);
         return tableData;
     } catch (error) {
         console.error('Error extracting table data:', error);
@@ -61,13 +72,52 @@ export async function extractTableData(page, config) {
 }
 
 /**
- * Extract contact details from specialist page (legacy function for compatibility)
+ * Extract specialty information from specialist page
+ * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
+ * @returns {Promise<string>} Specialty string
+ */
+export async function extractSpecialty(page, config) {
+    try {
+        // Skip if selector is empty or not provided
+        if (!config.SELECTORS.specialty || config.SELECTORS.specialty.trim() === '') {
+            return '';
+        }
+        
+        const specialty = await page.evaluate((selector) => {
+            const specialtyElements = document.querySelectorAll(selector);
+            
+            // Get the first specialty found
+            for (let element of specialtyElements) {
+                const text = element.textContent.trim();
+                if (text) {
+                    return text;
+                }
+            }
+            
+            return '';
+        }, config.SELECTORS.specialty);
+        
+        return specialty;
+    } catch (error) {
+        console.error('Error extracting specialty:', error);
+        return '';
+    }
+}
+
+/**
+ * Extract contact details from specialist page
  * @param {Page} page - Playwright page object
  * @param {Object} config - Configuration object
  * @returns {Promise<Array>} Array of contact details
  */
 export async function extractContactDetails(page, config) {
     try {
+        // Skip if selector is empty or not provided
+        if (!config.SELECTORS.contactLinks || config.SELECTORS.contactLinks.trim() === '') {
+            return [];
+        }
+        
         const contactDetails = await page.evaluate((selector) => {
             const contactElements = document.querySelectorAll(selector);
             const contacts = [];
@@ -170,31 +220,28 @@ export async function extractWithFallback(page, selector, dataType = 'text', att
  * @returns {Promise<Object>} Specialist data object
  */
 export async function extractSpecialistData(page, url, config) {
-    console.log(`Extracting data from specialist page: ${url}`);
+    console.log(`Extracting data from corporate entity page: ${url}`);
     
     try {
-        const companyName = await extractDoctorName(page, config);
-        const businessOverview = await extractTableData(page, config);
+        const entityName = await extractDoctorName(page, config);
+        const overviewData = await extractTableData(page, config);
         
-        const specialistData = {
+        const entityData = {
             url: url,
-            companyName: companyName,
-            businessOverview: businessOverview,
+            entityName: entityName,
+            overview: overviewData,
             extractedAt: new Date().toISOString()
         };
-        
-        console.log(`Extracted data for: ${companyName}`);
-        console.log(`Business overview entries found: ${businessOverview.length}`);
-        
-        return specialistData;
+        console.log(`Extracted data for: ${entityName}`);
+        return entityData;
         
     } catch (error) {
         console.error(`Error extracting data from ${url}:`, error);
         
         return {
             url: url,
-            companyName: 'Extraction failed',
-            businessOverview: [],
+            entityName: 'Extraction failed',
+            overview: [],
             error: error.message,
             extractedAt: new Date().toISOString()
         };

@@ -5,41 +5,49 @@
 
 export const LOCAL_CONFIG = {
     // Site configuration - modify these for your target site
-    siteName: 'OPENGOVSG',
+    siteName: 'Open Gov SG Corporate Entities',
     baseUrl: 'https://opengovsg.com/',
     startUrl: 'https://opengovsg.com/corporate?ssic=86201',
     allowedUrlPatterns: [
-      'https://opengovsg.com/corporate/',
-      'https://opengovsg.com/corporate/*',
-      'https://opengovsg.com/corporate?*'
+      'https://opengovsg.com/corporate*',
+      'https://opengovsg.com/corporate?ssic=86201&page=*'
     ],
-    excludedUrlPatterns: [
-      'https://opengovsg.com/corporate/about/',
-    ],
+    excludedUrlPatterns: [],
     
-    // Pagination settings
-    paginationType: 'query', // 'query' or 'path'
+    // Pagination settings - Query-based pagination for OpenGovSG
+    paginationType: 'query', // 'query', 'path', or 'ajax'
     queryPattern: 'page={page}', // for query pagination
     pathPattern: '', // for path pagination
-    paginationBaseUrl: null, // uses startUrl if null
+    paginationBaseUrl: 'https://opengovsg.com/corporate?ssic=86201', // Direct base URL for pagination
     startPage: 1,
+    maxPages: 11, // We know there are exactly 11 pages
     
-    // Selectors
-    specialistLinksSelector: '.panel-card .panel-body table td a',
-    nextButtonSelector: '.panel-footer ul.pager li a',
-    nextButtonContainerSelector: '.panel-footer ul.pager',
-    doctorNameSelector: '.panel-heading > h1',
-    contactLinksSelector: '.panel-body tbody tr td',
-    tableRowsSelector: '.panel-body tbody tr',
+    // Selectors for OpenGovSG Corporate Entities
+    specialistLinksSelector: '.panel-card .panel-body .table tr > td > a',
+    nextButtonSelector: '.panel-card .panel-footer .pager li:last-child a', // The actual next button
+    nextButtonContainerSelector: '.panel-card .panel-footer .pager li',
+    processingIndicatorSelector: 'body.processing', // Selector for AJAX loading indicator
+    doctorNameSelector: '.panel-heading h1',
+    specialtySelector: '', // Not needed for corporate entities
+    contactLinksSelector: '', // Not needed for corporate entities  
+    tableRowsSelector: '#overview.panel-card .panel-body .table tbody tr',
     
     // Crawler settings
-    maxRequestsPerCrawl: 5, // Lower for local testing, use -1 for unlimited crawling
-    headless: false, // Set to false for local debugging
-    timeout: 10000, // Request timeout in milliseconds
+    maxRequestsPerCrawl: -1, // Continue through ALL pages until pagination ends
+    headless: true, // Set to true for production, false for debugging
+    timeout: 100000, // Request timeout in milliseconds (increased for stability)
+    maxRetries: 3, // Number of retry attempts for failed entity extractions
+    browserRestartCount: 1, // Restart browser after EVERY page to completely eliminate persistence issues
+    
+    // Request intervals to prevent overwhelming the server (more conservative)
+    requestInterval: 8000, // Wait 8 seconds between each entity request (in milliseconds)
+    pageInterval: 15000, // Wait 15 seconds between page navigation (in milliseconds)  
+    retryInterval: 20000, // Wait 20 seconds before retry attempts (in milliseconds)
+    entityInterval: 5000, // Wait 5 seconds after each successful extraction (in milliseconds)
     
     
     // Output settings
-    outputFilename: 'mtalvernia-scraped-data', // Custom filename (will add .json automatically)
+    outputFilename: 'opengovsg-scraped-data', // Custom filename (will add .json automatically)
     
     // Cookies configuration
     cookies: [

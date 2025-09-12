@@ -1,94 +1,74 @@
 /**
- * Configuration settings for the OpenGovSG crawler
+ * Local development configuration
+ * This file is used when running the crawler locally for testing
  */
 
 export const CONFIG = {
-    // Site configuration
-    SITE: {
-        name: 'OPENGOVSG',
-        baseUrl: 'https://opengovsg.com/',
-        startUrl: 'https://opengovsg.com/corporate?ssic=86201',
-        allowedUrlPatterns: [
-            'https://opengovsg.com/corporate/',
-            'https://opengovsg.com/corporate/*',
-            'https://opengovsg.com/corporate?*'
-        ],
-        // Patterns to exclude (optional)
-        excludedUrlPatterns: [
-            'https://opengovsg.com/corporate/about/',
-        ],
-        // Pagination configuration
-        pagination: {
-            type: 'query',
-            queryPattern: 'page={page}',
-            // Base URL for pagination (if different from startUrl)
-            baseUrl: null, // Uses startUrl by default
-            // Starting page number (usually 1)
-            startPage: 1
-        }
-    },
-
-    // Selectors for web scraping
-    SELECTORS: {
-        // Specialist listing page selectors
-        specialistLinks: '.panel-card .panel-body table td a',
-        nextButton: '.panel-footer ul.pager li a',
-        nextButtonContainer: '.panel-footer ul.pager',
-        
-        // Specialist detail page selectors
-        doctorName: '.panel-heading > h1',
-        contactLinks: '.panel-body tbody tr td',
-        tableRows: '.panel-body tbody tr'
-    },
-
-    // Crawler settings
-    CRAWLER: {
-        maxRequestsPerCrawl: -1, // Use -1 for unlimited crawling in Apify
-        headless: true, // Set to true for production
-        timeout: 10000,
-        labels: {
-            DETAIL: 'DETAIL',
-            SPECIALISTS_LIST: 'SPECIALISTS_LIST'
-        }
-    },
-
-    // File output settings
-    OUTPUT: {
-        getFilename: () => {
-            return 'mtalvernia-scraped-data.json';
-        }
-    },
-
-    // User agents for rotation (expanded list for better diversity)
-    USER_AGENTS: [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.2 Safari/605.1.15',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:122.0) Gecko/20100101 Firefox/122.0',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (X11; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0'
+    // Site configuration - modify these for your target site
+    siteName: 'Open Gov SG Corporate Entities',
+    baseUrl: 'https://opengovsg.com/',
+    startUrl: 'https://opengovsg.com/corporate?ssic=86201',
+    allowedUrlPatterns: [
+      'https://opengovsg.com/corporate*',
+      'https://opengovsg.com/corporate?ssic=86201&page=*'
     ],
-
-    // Proxy configuration for IP rotation
-    PROXY: {
-        enabled: false, // Set to true to enable proxy rotation
-        rotationInterval: 10, // Rotate proxy every N requests
-        countries: ['US', 'SG', 'GB', 'CA', 'AU'], // Preferred countries
-        sessionPoolSize: 5 // Number of proxy sessions to maintain
-    },
-
-    // User agent for requests (legacy support)
-    USER_AGENT: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-
-    // Cookies configuration (empty by default, can be set via environment variables)
-    COOKIES: []
+    excludedUrlPatterns: [],
+    
+    // Pagination settings - Query-based pagination for OpenGovSG
+    paginationType: 'query', // 'query', 'path', or 'ajax'
+    queryPattern: 'page={page}', // for query pagination
+    pathPattern: '', // for path pagination
+    paginationBaseUrl: 'https://opengovsg.com/corporate?ssic=86201', // Direct base URL for pagination
+    startPage: 1,
+    maxPages: 11, // We know there are exactly 11 pages
+    
+    // Selectors for OpenGovSG Corporate Entities
+    specialistLinksSelector: '.panel-card .panel-body .table tr > td > a',
+    nextButtonSelector: '.panel-card .panel-footer .pager li:last-child a', // The actual next button
+    nextButtonContainerSelector: '.panel-card .panel-footer .pager li',
+    processingIndicatorSelector: 'body.processing', // Selector for AJAX loading indicator
+    doctorNameSelector: '.panel-heading h1',
+    specialtySelector: '', // Not needed for corporate entities
+    contactLinksSelector: '', // Not needed for corporate entities  
+    tableRowsSelector: '#overview.panel-card .panel-body .table tbody tr',
+    
+    // Crawler settings
+    maxRequestsPerCrawl: -1, // Continue through ALL pages until pagination ends
+    headless: true, // Set to true for production, false for debugging
+    timeout: 100000, // Request timeout in milliseconds (increased for stability)
+    maxRetries: 3, // Number of retry attempts for failed entity extractions
+    browserRestartCount: 1, // Restart browser after EVERY page to completely eliminate persistence issues
+    
+    // Request intervals to prevent overwhelming the server (more conservative)
+    requestInterval: 8000, // Wait 8 seconds between each entity request (in milliseconds)
+    pageInterval: 15000, // Wait 15 seconds between page navigation (in milliseconds)  
+    retryInterval: 20000, // Wait 20 seconds before retry attempts (in milliseconds)
+    entityInterval: 5000, // Wait 5 seconds after each successful extraction (in milliseconds)
+    
+    
+    // Output settings
+    outputFilename: 'opengovsg-scraped-data', // Custom filename (will add .json automatically)
+    
+    // Cookies configuration
+    cookies: [
+        // Add your cookies here in the format:
+        // {"domain":".example.com","expirationDate":1757322910.775961,"hostOnly":false,"httpOnly":true,"name":"cookie_name","path":"/","sameSite":"no_restriction","secure":true,"session":false,"storeId":"0","value":"cookie_value"}
+        // Example cookies format:
+        /*
+        {"domain":".example.com","expirationDate":1757322910.775961,"hostOnly":false,"httpOnly":true,"name":"session_id","path":"/","sameSite":"lax","secure":true,"session":false,"storeId":"0","value":"your_session_value_here"},
+        {"domain":".example.com","expirationDate":1759913811.713249,"hostOnly":false,"httpOnly":true,"name":"auth_token","path":"/","sameSite":"lax","secure":true,"session":false,"storeId":"0","value":"your_auth_token_here"}
+        */
+    ],
+    
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 };
+
+// You can override any of these settings by creating a local-config-override.js file
+// that exports a LOCAL_CONFIG_OVERRIDE object with your custom values
+try {
+    const { LOCAL_CONFIG_OVERRIDE } = await import('./local-config-override.js');
+    Object.assign(LOCAL_CONFIG, LOCAL_CONFIG_OVERRIDE);
+    console.log('✅ Local configuration overrides applied');
+} catch (error) {
+    // Override file doesn't exist, which is fine
+}

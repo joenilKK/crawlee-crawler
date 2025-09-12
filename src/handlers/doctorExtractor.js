@@ -21,7 +21,7 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
 
     try {
         // First, try to find doctor cards/containers
-        const doctorCards = customSelectors.doctorCards || '.doctor-card, .doctor-item, .profile-card, .specialist-card, .card';
+        const doctorCards = customSelectors.doctorCards || '.doctor-card, .doctor-item, .profile-card, .specialist-card, .card, .panel-card';
         
         // Extract doctors data by iterating through each doctor card
         const doctors = await page.evaluate((selectors) => {
