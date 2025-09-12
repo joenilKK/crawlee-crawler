@@ -4,6 +4,21 @@ import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js'
 import { handlePagination, handleInitialPagination } from './handlers/paginationHandler.js';
 import { shouldCrawlUrl } from './utils/helpers.js';
 import { 
+    getRandomViewport, 
+    getRealisticHeaders, 
+    getHardwareInfo, 
+    getScreenProperties,
+    getConnectionInfo,
+    getBatteryInfo,
+    getWebGLInfo,
+    getMediaDevices,
+    getChromeLoadTimes,
+    getChromeCSI,
+    generateMousePath,
+    getTypingDelay,
+    getScrollBehavior
+} from './utils/stealth.js';
+import { 
     getConfiguration, 
     handleDataOutput, 
     handleExit 
@@ -126,8 +141,53 @@ const crawler = new PlaywrightCrawler({
                 '--disable-features=TranslateUI',
                 '--disable-extensions',
                 '--disable-plugins',
-                '--disable-images',
-                '--disable-javascript',
+                '--disable-web-security',
+                '--allow-running-insecure-content',
+                '--disable-features=VizDisplayCompositor',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-features=IsolateOrigins,site-per-process',
+                '--disable-ipc-flooding-protection',
+                '--disable-renderer-backgrounding',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-client-side-phishing-detection',
+                '--disable-sync-preferences',
+                '--disable-default-apps',
+                '--disable-component-extensions-with-background-pages',
+                '--disable-background-networking',
+                '--disable-component-update',
+                '--disable-domain-reliability',
+                '--disable-features=AudioServiceOutOfProcess',
+                '--disable-hang-monitor',
+                '--disable-prompt-on-repost',
+                '--disable-sync',
+                '--disable-translate',
+                '--disable-windows10-custom-titlebar',
+                '--disable-features=TranslateUI',
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-web-security',
+                '--allow-running-insecure-content',
+                '--disable-features=VizDisplayCompositor',
+                '--exclude-switches=enable-automation',
+                '--disable-automation',
+                '--disable-dev-tools',
+                '--no-default-browser-check',
+                '--no-pings',
+                '--password-store=basic',
+                '--use-mock-keychain',
+                '--disable-component-extensions-with-background-pages',
+                '--disable-background-networking',
+                '--disable-component-update',
+                '--disable-domain-reliability',
+                '--disable-features=AudioServiceOutOfProcess',
+                '--disable-hang-monitor',
+                '--disable-prompt-on-repost',
+                '--disable-sync',
+                '--disable-translate',
+                '--disable-windows10-custom-titlebar',
+                '--disable-features=TranslateUI',
+                '--disable-extensions',
+                '--disable-plugins',
                 '--disable-web-security',
                 '--allow-running-insecure-content',
                 '--disable-features=VizDisplayCompositor',
@@ -138,25 +198,22 @@ const crawler = new PlaywrightCrawler({
     // Add pre-navigation handler to set cookies and stealth mode
     preNavigationHooks: [
         async ({ page, request }) => {
-            // Randomly select user agent
+            // Randomly select user agent and generate realistic configuration
             const randomUserAgent = CONFIG.USER_AGENTS[Math.floor(Math.random() * CONFIG.USER_AGENTS.length)];
+            const viewport = getRandomViewport();
+            const hardware = getHardwareInfo();
+            const screenProps = getScreenProperties(viewport);
+            const connection = getConnectionInfo();
+            const battery = getBatteryInfo();
+            const webgl = getWebGLInfo();
+            const mediaDevices = getMediaDevices();
             
-            // Set realistic headers and viewport
-            await page.setViewportSize({ width: 1366, height: 768 });
-            await page.setExtraHTTPHeaders({
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-User': '?1',
-                'Cache-Control': 'max-age=0',
-                'User-Agent': randomUserAgent
-            });
+            // Set realistic viewport
+            await page.setViewportSize(viewport);
+            
+            // Set realistic headers based on user agent
+            const headers = getRealisticHeaders(randomUserAgent);
+            await page.setExtraHTTPHeaders(headers);
 
             // User agent is already set in launch options and HTTP headers
 
@@ -170,24 +227,81 @@ const crawler = new PlaywrightCrawler({
                 }
             }
 
-            // Add stealth mode scripts
-            await page.addInitScript(() => {
-                // Remove webdriver property
+            // Add comprehensive stealth mode scripts with dynamic values
+            await page.addInitScript(({ 
+                userAgent, 
+                viewport, 
+                hardware, 
+                screenProps, 
+                connection, 
+                battery, 
+                webgl, 
+                mediaDevices,
+                chromeLoadTimes,
+                chromeCSI
+            }) => {
+                // Remove webdriver property completely
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined,
                 });
 
-                // Mock plugins
+                // Remove automation indicators
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+                delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+
+                // Mock realistic plugins
                 Object.defineProperty(navigator, 'plugins', {
-                    get: () => [1, 2, 3, 4, 5],
+                    get: () => {
+                        const plugins = [
+                            {
+                                0: { type: "application/x-google-chrome-pdf", suffixes: "pdf", description: "Portable Document Format", enabledPlugin: Plugin },
+                                description: "Portable Document Format",
+                                filename: "internal-pdf-viewer",
+                                length: 1,
+                                name: "Chrome PDF Plugin"
+                            },
+                            {
+                                0: { type: "application/pdf", suffixes: "pdf", description: "", enabledPlugin: Plugin },
+                                description: "",
+                                filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai",
+                                length: 1,
+                                name: "Chrome PDF Viewer"
+                            },
+                            {
+                                0: { type: "application/x-nacl", suffixes: "", description: "Native Client Executable", enabledPlugin: Plugin },
+                                1: { type: "application/x-pnacl", suffixes: "", description: "Portable Native Client Executable", enabledPlugin: Plugin },
+                                description: "",
+                                filename: "internal-nacl-plugin",
+                                length: 2,
+                                name: "Native Client"
+                            }
+                        ];
+                        return plugins;
+                    },
                 });
 
-                // Mock languages
+                // Mock realistic languages
                 Object.defineProperty(navigator, 'languages', {
                     get: () => ['en-US', 'en'],
                 });
 
-                // Mock permissions
+                // Mock hardware concurrency
+                Object.defineProperty(navigator, 'hardwareConcurrency', {
+                    get: () => hardware.cores,
+                });
+
+                // Mock device memory
+                Object.defineProperty(navigator, 'deviceMemory', {
+                    get: () => hardware.memory,
+                });
+
+                // Mock platform
+                Object.defineProperty(navigator, 'platform', {
+                    get: () => hardware.platform,
+                });
+
+                // Mock permissions API
                 const originalQuery = window.navigator.permissions.query;
                 window.navigator.permissions.query = (parameters) => (
                     parameters.name === 'notifications' ?
@@ -195,20 +309,133 @@ const crawler = new PlaywrightCrawler({
                         originalQuery(parameters)
                 );
 
-                // Mock chrome object
+                // Mock chrome object with realistic properties
+                
                 window.chrome = {
-                    runtime: {},
+                    runtime: {
+                        onConnect: undefined,
+                        onMessage: undefined,
+                    },
+                    loadTimes: function() {
+                        return chromeLoadTimes;
+                    },
+                    csi: function() {
+                        return chromeCSI;
+                    }
                 };
 
-                // Override the `plugins` property to use a custom getter
-                Object.defineProperty(navigator, 'plugins', {
-                    get: () => [1, 2, 3, 4, 5],
+                // Mock realistic screen properties
+                Object.defineProperty(screen, 'availTop', { get: () => screenProps.availTop });
+                Object.defineProperty(screen, 'availLeft', { get: () => screenProps.availLeft });
+                Object.defineProperty(screen, 'availWidth', { get: () => screenProps.availWidth });
+                Object.defineProperty(screen, 'availHeight', { get: () => screenProps.availHeight });
+                Object.defineProperty(screen, 'colorDepth', { get: () => screenProps.colorDepth });
+                Object.defineProperty(screen, 'pixelDepth', { get: () => screenProps.pixelDepth });
+                Object.defineProperty(screen, 'width', { get: () => screenProps.width });
+                Object.defineProperty(screen, 'height', { get: () => screenProps.height });
+
+                // Mock battery API
+                Object.defineProperty(navigator, 'getBattery', {
+                    get: () => () => Promise.resolve(battery)
                 });
 
-                // Override the `languages` property to use a custom getter
-                Object.defineProperty(navigator, 'languages', {
-                    get: () => ['en-US', 'en'],
+                // Mock connection API
+                Object.defineProperty(navigator, 'connection', {
+                    get: () => connection
                 });
+
+                // Mock media devices
+                Object.defineProperty(navigator, 'mediaDevices', {
+                    get: () => ({
+                        enumerateDevices: () => Promise.resolve(mediaDevices)
+                    })
+                });
+
+                // Override Date.prototype.getTimezoneOffset to return realistic timezone
+                const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
+                Date.prototype.getTimezoneOffset = function() {
+                    return -480; // UTC+8 (Singapore timezone)
+                };
+
+                // Mock WebGL to avoid fingerprinting
+                const getParameter = WebGLRenderingContext.prototype.getParameter;
+                WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                    if (parameter === 37445) {
+                        return webgl.vendor;
+                    }
+                    if (parameter === 37446) {
+                        return webgl.renderer;
+                    }
+                    return getParameter(parameter);
+                };
+
+                // Mock canvas fingerprinting
+                const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+                HTMLCanvasElement.prototype.toDataURL = function() {
+                    const context = this.getContext('2d');
+                    if (context) {
+                        const imageData = context.getImageData(0, 0, this.width, this.height);
+                        for (let i = 0; i < imageData.data.length; i += 4) {
+                            imageData.data[i] = imageData.data[i] ^ 1;
+                            imageData.data[i + 1] = imageData.data[i + 1] ^ 1;
+                            imageData.data[i + 2] = imageData.data[i + 2] ^ 1;
+                        }
+                        context.putImageData(imageData, 0, 0);
+                    }
+                    return originalToDataURL.apply(this, arguments);
+                };
+
+                // Mock WebRTC to prevent IP leakage
+                const originalCreateDataChannel = RTCPeerConnection.prototype.createDataChannel;
+                RTCPeerConnection.prototype.createDataChannel = function() {
+                    return originalCreateDataChannel.apply(this, arguments);
+                };
+
+                // Override getClientRects to avoid detection
+                const originalGetClientRects = Element.prototype.getClientRects;
+                Element.prototype.getClientRects = function() {
+                    const rects = originalGetClientRects.call(this);
+                    return Array.from(rects).map(rect => ({
+                        ...rect,
+                        top: rect.top + Math.random() * 0.1,
+                        left: rect.left + Math.random() * 0.1,
+                        bottom: rect.bottom + Math.random() * 0.1,
+                        right: rect.right + Math.random() * 0.1
+                    }));
+                };
+
+                // Mock realistic timing
+                const originalNow = performance.now;
+                performance.now = function() {
+                    return originalNow.call(this) + Math.random() * 0.1;
+                };
+
+                // Remove automation traces
+                delete window.__nightmare;
+                delete window._phantom;
+                delete window.callPhantom;
+                delete window._selenium;
+                delete window.__selenium_unwrapped;
+                delete window.__webdriver_evaluate;
+                delete window.__webdriver_script_func;
+                delete window.__webdriver_script_fn;
+                delete window.__fxdriver_evaluate;
+                delete window.__driver_unwrapped;
+                delete window.__webdriver_unwrapped;
+                delete window.__driver_evaluate;
+                delete window.__selenium_evaluate;
+                delete window.__webdriver_script_function;
+            }, {
+                userAgent: randomUserAgent,
+                viewport: viewport,
+                hardware: hardware,
+                screenProps: screenProps,
+                connection: connection,
+                battery: battery,
+                webgl: webgl,
+                mediaDevices: mediaDevices,
+                chromeLoadTimes: getChromeLoadTimes(),
+                chromeCSI: getChromeCSI()
             });
         }
     ],
@@ -228,12 +455,30 @@ const crawler = new PlaywrightCrawler({
     // Add random delays between requests
     minConcurrency: 1,
     maxConcurrency: 1,
-    // Add proxy support (if available)
-    proxyConfiguration: process.env.APIFY_PROXY_GROUPS ? {
-        useApifyProxy: true,
-        apifyProxyGroups: process.env.APIFY_PROXY_GROUPS.split(','),
-        apifyProxyCountry: process.env.APIFY_PROXY_COUNTRY || 'US'
-    } : undefined,
+    // Enhanced proxy support with rotation
+    proxyConfiguration: (() => {
+        // Check if Apify proxy is available
+        if (process.env.APIFY_PROXY_GROUPS) {
+            return {
+                useApifyProxy: true,
+                apifyProxyGroups: process.env.APIFY_PROXY_GROUPS.split(','),
+                apifyProxyCountry: process.env.APIFY_PROXY_COUNTRY || CONFIG.PROXY.countries[0],
+                apifyProxySessionRotationProbability: 0.3, // 30% chance to rotate session
+                apifyProxyMaxUsedSessions: CONFIG.PROXY.sessionPoolSize
+            };
+        }
+        
+        // Check if local proxy configuration is enabled
+        if (CONFIG.PROXY.enabled) {
+            return {
+                useApifyProxy: false,
+                // Add custom proxy configuration here if needed
+                // proxyUrls: ['http://proxy1:port', 'http://proxy2:port']
+            };
+        }
+        
+        return undefined;
+    })(),
     // Handle failed requests with better retry logic
     failedRequestHandler: async ({ request, error }) => {
         console.error(`❌ Request failed: ${error.message}`);
@@ -263,12 +508,56 @@ const crawler = new PlaywrightCrawler({
         await page.waitForTimeout(delay);
         console.log(`Processing: ${request.url}`);
 
-        // Add random mouse movements to simulate human behavior
+        // Add realistic human behavior simulation
         try {
-            await page.mouse.move(Math.random() * 800 + 100, Math.random() * 600 + 100);
-            await page.waitForTimeout(Math.random() * 1000 + 500);
+            const viewport = page.viewportSize();
+            const centerX = viewport.width / 2;
+            const centerY = viewport.height / 2;
+            
+            // Generate realistic mouse movement path
+            const endX = centerX + (Math.random() - 0.5) * 200;
+            const endY = centerY + (Math.random() - 0.5) * 200;
+            const mousePath = generateMousePath(centerX, centerY, endX, endY);
+            
+            // Move mouse along the path
+            for (const point of mousePath) {
+                await page.mouse.move(point.x, point.y);
+                await page.waitForTimeout(getTypingDelay() / 2);
+            }
+            
+            // Simulate reading behavior - scroll with realistic behavior
+            const scrollBehavior = getScrollBehavior();
+            if (scrollBehavior.smooth) {
+                await page.mouse.wheel(0, scrollBehavior.distance);
+                await page.waitForTimeout(scrollBehavior.duration);
+            }
+            
+            // Random click simulation (sometimes)
+            if (Math.random() < 0.3) {
+                const clickX = centerX + (Math.random() - 0.5) * 100;
+                const clickY = centerY + (Math.random() - 0.5) * 100;
+                await page.mouse.click(clickX, clickY);
+                await page.waitForTimeout(getTypingDelay());
+            }
+            
+            // Simulate keyboard activity with realistic timing
+            if (Math.random() < 0.2) {
+                const keys = ['Tab', 'ArrowDown', 'ArrowUp', 'Space', 'Escape'];
+                const randomKey = keys[Math.floor(Math.random() * keys.length)];
+                await page.keyboard.press(randomKey);
+                await page.waitForTimeout(getTypingDelay());
+            }
+            
+            // Simulate realistic page interaction patterns
+            if (Math.random() < 0.4) {
+                // Random scroll to simulate reading
+                const scrollAmount = Math.random() * 200 + 100;
+                await page.mouse.wheel(0, scrollAmount);
+                await page.waitForTimeout(Math.random() * 1000 + 500);
+            }
+            
         } catch (error) {
-            // Ignore mouse movement errors
+            // Ignore mouse/keyboard simulation errors
         }
         
         
