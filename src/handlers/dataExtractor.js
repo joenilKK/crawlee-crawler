@@ -1,6 +1,9 @@
 /**
  * Data extraction utilities for specialist information and flexible scraping
+ * Enhanced with anti-detection measures
  */
+
+import { simulateHumanInteraction, detectBotProtection, handleBotDetection } from '../utils/antiDetection.js';
 
 /**
  * Extract doctor name from specialist page
@@ -118,41 +121,6 @@ export async function extractDoctorName(page, config) {
         return 'Name not found';
     } catch (error) {
         return 'Name extraction failed';
-    }
-}
-
-/**
- * Extract table data as key-value pairs from table rows
- * @param {Page} page - Playwright page object
- * @param {Object} config - Configuration object
- * @returns {Promise<Array>} Array of table row data
- */
-export async function extractTableData(page, config) {
-    try {
-        const tableData = await page.evaluate((selector) => {
-            const tableRows = document.querySelectorAll(selector);
-            const businessOverview = [];
-            
-            tableRows.forEach(row => {
-                const cells = row.querySelectorAll('td');
-                if (cells.length >= 2) {
-                    const key = cells[0].textContent.trim();
-                    const value = cells[1].textContent.trim();
-                    if (key && value) {
-                        businessOverview.push({
-                            key: key,
-                            value: value
-                        });
-                    }
-                }
-            });
-            
-            return businessOverview;
-        }, config.SELECTORS.tableRows);
-        
-        return tableData;
-    } catch (error) {
-        return [];
     }
 }
 
@@ -354,6 +322,16 @@ export async function extractSpecialistData(page, url, config) {
             return null;
         }
         
+        // Check for bot protection before extraction
+        const isBotDetected = await detectBotProtection(page);
+        if (isBotDetected) {
+            console.log(`🛡️ Bot detection detected on ${url}, implementing countermeasures...`);
+            await handleBotDetection(page);
+        }
+        
+        // Simulate human interaction before extraction
+        await simulateHumanInteraction(page);
+        
         try {
             await page.waitForLoadState('networkidle', { timeout: 20000 });
         } catch (loadError) {
@@ -509,7 +487,6 @@ export async function extractSpecialistData(page, url, config) {
         const doctorName = await extractDoctorName(page, config);
         const specialty = await extractSpecialty(page, config);
         const contact = await extractContactDetails(page, config);
-        const doctorinfo = await extractTableData(page, config);
         
         const hasMeaningfulData = (doctorName && doctorName !== 'Name not found' && doctorName !== 'Name extraction failed') || 
                                  (specialty && specialty.length > 0) || 
@@ -525,7 +502,6 @@ export async function extractSpecialistData(page, url, config) {
             doctorname: doctorName,
             specialty: specialty,
             contact: contact,
-            businessOverview: doctorinfo
         };
         
         return specialistData;

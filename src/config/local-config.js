@@ -34,11 +34,11 @@ export const LOCAL_CONFIG = {
     // Crawler settings
     maxRequestsPerCrawl: 5, // Lower for local testing, use -1 for unlimited crawling
     headless: false, // Set to false for local debugging
-    timeout: 30000, // Request timeout in milliseconds (increased from 15s to 30s)
-    delayBetweenLinks: 3000, // Delay in milliseconds between processing each doctor link (reduced from 4s to 3s)
-    delayBeforeNavigation: 2000, // Delay before navigating to each doctor page
-    delayAfterPageLoad: 5000, // Delay after page loads to ensure stability (increased from 3s to 5s)
-    ajaxPaginationDelay: 6000, // Extra delay for AJAX pagination (increased from 4s to 6s)
+    timeout: 15000, // Request timeout in milliseconds (reduced from 30s to 15s)
+    delayBetweenLinks: 200, // Delay in milliseconds between processing each doctor link (further reduced from 500ms)
+    delayBeforeNavigation: 200, // Delay before navigating to each doctor page (further reduced from 500ms)
+    delayAfterPageLoad: 500, // Delay after page loads to ensure stability (further reduced from 1000ms)
+    ajaxPaginationDelay: 1000, // Extra delay for AJAX pagination (further reduced from 2000ms)
     
     
     // Output settings

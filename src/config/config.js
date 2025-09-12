@@ -42,17 +42,30 @@ export const CONFIG = {
 
     // Crawler settings
     CRAWLER: {
-        // No maxRequestsPerCrawl - crawl all pages
-        headless: true, // Set to true for production
-        timeout: 30000, // Request timeout in milliseconds
-        delayBetweenLinks: 3000, // Delay in milliseconds between processing each doctor link
-        delayBeforeNavigation: 2000, // Delay before navigating to each doctor page
-        delayAfterPageLoad: 5000, // Delay after page loads to ensure stability
-        ajaxPaginationDelay: 6000, // Extra delay for AJAX pagination
+        maxRequestsPerCrawl: -1, // Lower for local testing, use -1 for unlimited crawling
+        headless: true, // Set to false for local debugging
+        timeout: 15000, // Request timeout in milliseconds (reduced from 30s to 15s)
+        delayBetweenLinks: 200, // Delay in milliseconds between processing each doctor link (further reduced from 500ms)
+        delayBeforeNavigation: 200, // Delay before navigating to each doctor page (further reduced from 500ms)
+        delayAfterPageLoad: 500, // Delay after page loads to ensure stability (further reduced from 1000ms)
+        ajaxPaginationDelay: 1000, // Extra delay for AJAX pagination (further reduced from 2000ms)
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         labels: {
             DETAIL: 'DETAIL',
             SPECIALISTS_LIST: 'SPECIALISTS_LIST'
+        },
+        // Anti-detection settings
+        antiDetection: {
+            enabled: true,
+            randomizeUserAgent: true,
+            randomizeViewport: true,
+            randomizeTimezone: true,
+            simulateHumanBehavior: true,
+            useProxyRotation: false, // Set to true if you have proxies configured
+            stealthMode: true,
+            humanLikeDelays: true,
+            mouseMovementSimulation: true,
+            scrollSimulation: true
         }
     },
 

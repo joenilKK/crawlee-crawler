@@ -41,8 +41,8 @@ export async function handleAjaxPagination(page, config) {
         console.log(`   ✅ Next button is enabled`);
         
         // Add small delay before clicking to ensure button is ready
-        console.log(`   ⏳ Adding 1s delay before clicking next button...`);
-        await page.waitForTimeout(1000);
+        console.log(`   ⏳ Adding 200ms delay before clicking next button...`);
+        await page.waitForTimeout(200);
         
         // Store current page content to compare after pagination
         console.log(`   📊 Capturing current page content for comparison...`);
@@ -64,7 +64,7 @@ export async function handleAjaxPagination(page, config) {
         const processingStartTime = Date.now();
         try {
             await page.waitForSelector(config.SELECTORS.processingIndicator, { 
-                timeout: 5000,
+                timeout: 2000,
                 state: 'attached'
             });
             console.log(`   ✅ Processing indicator appeared after ${Date.now() - processingStartTime}ms`);
@@ -77,14 +77,14 @@ export async function handleAjaxPagination(page, config) {
         const processingEndTime = Date.now();
         try {
             await page.waitForSelector(config.SELECTORS.processingIndicator, { 
-                timeout: 30000,
+                timeout: 10000,
                 state: 'detached'
             });
             console.log(`   ✅ Processing indicator disappeared after ${Date.now() - processingEndTime}ms`);
         } catch (error) {
             console.log(`   ⚠️  Processing indicator still present after ${Date.now() - processingEndTime}ms - using fallback delay`);
             // Fallback: wait for a longer time to handle slower responses
-            await page.waitForTimeout(5000);
+            await page.waitForTimeout(2000);
         }
         
         // Additional wait to ensure content is fully loaded

@@ -8,6 +8,16 @@ import {
     handleDataOutput, 
     handleExit 
 } from './config/environment.js';
+import { 
+    generateBrowserFingerprint, 
+    getStealthBrowserArgs, 
+    configureStealthPage, 
+    simulateHumanInteraction, 
+    detectBotProtection, 
+    handleBotDetection,
+    getHumanLikeDelay 
+} from './utils/antiDetection.js';
+import { createProxyManager } from './utils/proxyManager.js';
 
 /**
  * Convert browser extension cookies to Playwright format
@@ -129,32 +139,67 @@ createBackupIfExists(CONFIG.OUTPUT.getFilename(), CONFIG);
 // Convert cookies to Playwright format
 const playwrightCookies = convertCookiesToPlaywrightFormat(CONFIG.COOKIES);
 
+// Initialize proxy manager
+const proxyManager = createProxyManager();
+
+// Generate browser fingerprint for this session
+const browserFingerprint = generateBrowserFingerprint();
 
 const crawler = new PlaywrightCrawler({
     launchContext: {
         launchOptions: {
             headless: CONFIG.CRAWLER.headless,
-            ignoreHTTPSErrors: true
+            ignoreHTTPSErrors: true,
+            args: [
+                ...getStealthBrowserArgs(),
+                `--user-agent=${browserFingerprint.userAgent}`,
+                `--window-size=${browserFingerprint.viewport.width},${browserFingerprint.viewport.height}`,
+                `--lang=${browserFingerprint.languages[0]}`,
+                `--timezone=${browserFingerprint.timezone}`
+            ]
         }
     },
     browserPoolOptions: {
-        useFingerprints: false,
+        useFingerprints: true,
+        fingerprintOptions: {
+            fingerprintGeneratorOptions: {
+                locales: browserFingerprint.languages,
+                devices: ['desktop'],
+                operatingSystems: [browserFingerprint.platform === 'Win32' ? 'windows' : 'macos'],
+                browsers: ['chrome']
+            }
+        },
         preLaunchHooks: [
             async (pageId, launchContext) => {
+                // Get proxy for this browser instance
+                const proxy = proxyManager.getNextProxy();
+                if (proxy) {
+                    const playwrightProxy = proxyManager.toPlaywrightFormat(proxy);
+                    if (playwrightProxy) {
+                        launchContext.launchOptions.proxy = playwrightProxy;
+                    }
+                }
+                
                 launchContext.launchOptions = {
                     ...launchContext.launchOptions,
                     args: [
                         ...launchContext.launchOptions.args || [],
-                        `--user-agent=${CONFIG.CRAWLER.userAgent}`
+                        `--user-agent=${browserFingerprint.userAgent}`,
+                        `--window-size=${browserFingerprint.viewport.width},${browserFingerprint.viewport.height}`,
+                        `--lang=${browserFingerprint.languages[0]}`,
+                        `--timezone=${browserFingerprint.timezone}`
                     ]
                 };
             }
         ]
     },
-    // Add pre-navigation handler to set cookies
+    // Add pre-navigation handler to set cookies and configure stealth
     preNavigationHooks: [
         async ({ page, request }) => {
-                            // Set cookies before navigation if we have any
+            // Configure stealth page
+            await configureStealthPage(page, browserFingerprint);
+            
+            // Set cookies before navigation if we have any
             if (playwrightCookies.length > 0) {
                 try {
                     await page.context().addCookies(playwrightCookies);
@@ -162,6 +207,10 @@ const crawler = new PlaywrightCrawler({
                     // Silently handle cookie setting errors
                 }
             }
+            
+            // Add random delay before navigation
+            const delay = getHumanLikeDelay(100, 0.3);
+            await page.waitForTimeout(delay);
         }
     ],
     // Session pool options
@@ -174,8 +223,8 @@ const crawler = new PlaywrightCrawler({
         }
     },
     // Add delays between requests to avoid being detected as a bot
-    requestHandlerTimeoutSecs: 180, // Increased from 60 to 180 seconds
-    navigationTimeoutSecs: 60, // Increased from 30 to 60 seconds
+    requestHandlerTimeoutSecs: 360, // Increased to 360 seconds for longer processing
+    navigationTimeoutSecs: 30, // Reduced from 60 to 30 seconds
     // Add random delays between requests
     minConcurrency: 1,
     maxConcurrency: 1,
@@ -184,13 +233,23 @@ const crawler = new PlaywrightCrawler({
         console.log(`❌ Failed: ${request.url}`);
     },
     // Increase max retries but with specific conditions
-    maxRequestRetries: 2,
+    maxRequestRetries: 5,
     requestHandler: async ({ page, request, enqueueLinks }) => {
         const startTime = Date.now();
         console.log(`\n🔍 Processing: ${request.url}`);
         
-        // Add random delay between 2-5 seconds to mimic human behavior
-        const delay = Math.random() * 3000 + 2000;
+        // Check for bot protection
+        const isBotDetected = await detectBotProtection(page);
+        if (isBotDetected) {
+            console.log(`🛡️ Bot detection detected, implementing countermeasures...`);
+            await handleBotDetection(page);
+        }
+        
+        // Simulate human interaction
+        await simulateHumanInteraction(page);
+        
+        // Add human-like delay
+        const delay = getHumanLikeDelay(200, 0.4);
         await page.waitForTimeout(delay);
         
         
@@ -247,14 +306,21 @@ const crawler = new PlaywrightCrawler({
                         processedUrls.add(doctor.url);
                         
                         if (i > 0 || currentPage > 1) {
-                            await page.waitForTimeout(CONFIG.CRAWLER.delayBetweenLinks);
+                            // Human-like delay between links
+                            const linkDelay = getHumanLikeDelay(CONFIG.CRAWLER.delayBetweenLinks, 0.2);
+                            await page.waitForTimeout(linkDelay);
                         }
                         
                         let doctorPage = null;
                         try {
-                            await page.waitForTimeout(CONFIG.CRAWLER.delayBeforeNavigation);
+                            // Human-like delay before navigation
+                            const navDelay = getHumanLikeDelay(CONFIG.CRAWLER.delayBeforeNavigation, 0.2);
+                            await page.waitForTimeout(navDelay);
                             
                             doctorPage = await page.context().newPage();
+                            
+                            // Configure stealth for new page
+                            await configureStealthPage(doctorPage, browserFingerprint);
                             
                             try {
                                 await doctorPage.goto(doctor.url, { 
@@ -282,7 +348,12 @@ const crawler = new PlaywrightCrawler({
                                 throw new Error('Redirected to invalid page');
                             }
                             
-                            await doctorPage.waitForTimeout(CONFIG.CRAWLER.delayAfterPageLoad);
+                            // Human-like delay after page load
+                            const loadDelay = getHumanLikeDelay(CONFIG.CRAWLER.delayAfterPageLoad, 0.2);
+                            await doctorPage.waitForTimeout(loadDelay);
+                            
+                            // Simulate human interaction on the page
+                            await simulateHumanInteraction(doctorPage);
                             
                             const extractionTimeout = 30000;
                             let doctorData = null;
@@ -331,7 +402,9 @@ const crawler = new PlaywrightCrawler({
                             if (doctorPage && !doctorPage.isClosed()) {
                                 await doctorPage.close();
                             }
-                            await page.waitForTimeout(1500);
+                            // Human-like delay after processing each doctor
+                            const processingDelay = getHumanLikeDelay(100, 0.2);
+                            await page.waitForTimeout(processingDelay);
                         }
                     }
                     
@@ -341,7 +414,9 @@ const crawler = new PlaywrightCrawler({
                         if (hasMorePages) {
                             currentPage++;
                             console.log(`\n➡️ Next page: ${currentPage}`);
-                            await page.waitForTimeout(CONFIG.CRAWLER.ajaxPaginationDelay);
+                            // Human-like delay for pagination
+                            const paginationDelay = getHumanLikeDelay(CONFIG.CRAWLER.ajaxPaginationDelay, 0.3);
+                            await page.waitForTimeout(paginationDelay);
                         } else {
                             console.log(`\n🏁 No more pages`);
                         }
