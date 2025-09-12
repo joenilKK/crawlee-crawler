@@ -123,6 +123,79 @@ export async function extractContactDetails(page, config) {
 }
 
 /**
+ * Extract unit number from specialist page
+ * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
+ * @returns {Promise<string>} Unit number
+ */
+export async function extractUnitNumber(page, config) {
+    try {
+        console.log(`Looking for unit number with selector: ${config.SELECTORS.unitNumber}`);
+        
+        // First try the configured selector
+        const unitNumber = await extractWithFallback(page, config.SELECTORS.unitNumber, 'text');
+        
+        if (unitNumber) {
+            console.log(`Found unit number with primary selector: ${unitNumber}`);
+            // If we got an array, take the first non-empty result
+            if (Array.isArray(unitNumber)) {
+                return unitNumber.find(text => text && text.trim()) || '';
+            }
+            return unitNumber;
+        }
+        
+        console.log('Primary selector failed, trying fallback methods...');
+        
+        // Fallback 1: Look for unit number in the contact area
+        const fallbackResult = await page.evaluate(() => {
+            const clinicContacts = document.querySelector('.clinic-contacts');
+            if (!clinicContacts) {
+                console.log('No .clinic-contacts found');
+                return '';
+            }
+            
+            const text = clinicContacts.textContent.trim();
+            console.log('Clinic contacts text:', text);
+            
+            return text;
+        });
+        
+        if (fallbackResult) {
+            console.log(`Found unit number with fallback: ${fallbackResult}`);
+            return fallbackResult;
+        }
+        
+        // Fallback 2: Look for any element containing "unit" text
+        const unitElements = await page.evaluate(() => {
+            const elements = document.querySelectorAll('*');
+            const unitTexts = [];
+            
+            for (const element of elements) {
+                const text = element.textContent?.trim();
+                if (text && text.toLowerCase().includes('unit') && text.length < 50) {
+                    unitTexts.push(text);
+                }
+            }
+            
+            return unitTexts;
+        });
+        
+        console.log('All elements containing "unit":', unitElements);
+        
+        // Return the first unit text found
+        if (unitElements.length > 0) {
+            return unitElements[0];
+        }
+        
+        console.log('No unit number found with any method');
+        return '';
+    } catch (error) {
+        console.error('Error extracting unit number:', error);
+        return '';
+    }
+}
+
+/**
  * Extract data using flexible selectors with fallbacks
  * @param {Page} page - Playwright page object
  * @param {string} selector - CSS selector(s) separated by commas
@@ -206,13 +279,16 @@ export async function extractSpecialistData(page, url, config) {
         const specialty = await extractSpecialty(page, config);
         const contact = await extractContactDetails(page, config);
         const doctorinfo = await extractTableData(page, config);
+        const unitNumber = await extractUnitNumber(page, config);
         
         const specialistData = {
+            extractedDate: new Date().toISOString().split('T')[0],
             url: url,
             doctorname: doctorName,
             specialty: specialty,
             contact: contact,
             businessOverview: doctorinfo,
+            unitNumber: unitNumber,
             extractedAt: new Date().toISOString()
         };
         console.log(`Extracted data for: ${doctorName}`);
@@ -222,11 +298,13 @@ export async function extractSpecialistData(page, url, config) {
         console.error(`Error extracting data from ${url}:`, error);
         
         return {
+            extractedDate: new Date().toISOString().split('T')[0],
             url: url,
             doctorname: 'Extraction failed',
             specialty: '',
             contact: [],
             businessOverview: [],
+            unitNumber: '',
             error: error.message,
             extractedAt: new Date().toISOString()
         };

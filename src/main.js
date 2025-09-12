@@ -86,7 +86,8 @@ const CONFIG = {
         doctorName: LOCAL_CONFIG.doctorNameSelector,
         specialty: LOCAL_CONFIG.specialtySelector,
         contactLinks: LOCAL_CONFIG.contactLinksSelector,
-        tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr'
+        tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr',
+        unitNumber: LOCAL_CONFIG.unitNumber
     },
     CRAWLER: {
         maxRequestsPerCrawl: input.maxRequestsPerCrawl,

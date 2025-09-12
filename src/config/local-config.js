@@ -31,9 +31,10 @@ export const LOCAL_CONFIG = {
     specialtySelector: '.doc-personalinfo .col .grid-box a',
     contactLinksSelector: '.clinic-contacts a',
     tableRowsSelector: '.clinic-contacts .grid a',
+    unitNumber: '.unit-no .unit',
     
     // Crawler settings
-    maxRequestsPerCrawl: -1, // Lower for local testing, use -1 for unlimited crawling
+    maxRequestsPerCrawl: 4, // Lower for local testing, use -1 for unlimited crawling
     headless: false, // Set to false for local debugging
     timeout: 10000, // Request timeout in milliseconds
     

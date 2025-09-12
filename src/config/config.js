@@ -38,7 +38,8 @@ export const CONFIG = {
         doctorName: 'h1.masthead-title',
         specialty: '.doc-personalinfo .col .grid-box a',
         contactLinks: '.clinic-contacts a',
-        tableRows: '.clinic-contacts .grid a'
+        tableRows: '.clinic-contacts .grid a',
+        unitNumber: '.unit-no .unit',
     },
 
     // Crawler settings

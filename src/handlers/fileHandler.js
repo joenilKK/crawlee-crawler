@@ -26,6 +26,7 @@ export async function saveDataToFile(extractedData, config, originalCookies = nu
             doctorname: record.doctorname,
             specialty: record.specialty,
             contact: record.contact,
+            unitNumber: record.unitNumber,
             // Include original cookies if provided
             cookies: originalCookies && originalCookies.length > 0 ? originalCookies : undefined
         };
