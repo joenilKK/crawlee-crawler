@@ -209,7 +209,7 @@ const crawler = new PlaywrightCrawler({
             }
             
             // Add random delay before navigation
-            const delay = getHumanLikeDelay(100, 0.3);
+            const delay = getHumanLikeDelay(50, 0.1);
             await page.waitForTimeout(delay);
         }
     ],
@@ -223,8 +223,8 @@ const crawler = new PlaywrightCrawler({
         }
     },
     // Add delays between requests to avoid being detected as a bot
-    requestHandlerTimeoutSecs: 360, // Increased to 360 seconds for longer processing
-    navigationTimeoutSecs: 30, // Reduced from 60 to 30 seconds
+    requestHandlerTimeoutSecs: 1000, // Increased to 1000 seconds for longer processing
+    navigationTimeoutSecs: 20, // Further reduced to 20 seconds
     // Add random delays between requests
     minConcurrency: 1,
     maxConcurrency: 1,
@@ -249,7 +249,7 @@ const crawler = new PlaywrightCrawler({
         await simulateHumanInteraction(page);
         
         // Add human-like delay
-        const delay = getHumanLikeDelay(200, 0.4);
+        const delay = getHumanLikeDelay(100, 0.2);
         await page.waitForTimeout(delay);
         
         
@@ -307,14 +307,14 @@ const crawler = new PlaywrightCrawler({
                         
                         if (i > 0 || currentPage > 1) {
                             // Human-like delay between links
-                            const linkDelay = getHumanLikeDelay(CONFIG.CRAWLER.delayBetweenLinks, 0.2);
+                            const linkDelay = getHumanLikeDelay(CONFIG.CRAWLER.delayBetweenLinks, 0.1);
                             await page.waitForTimeout(linkDelay);
                         }
                         
                         let doctorPage = null;
                         try {
                             // Human-like delay before navigation
-                            const navDelay = getHumanLikeDelay(CONFIG.CRAWLER.delayBeforeNavigation, 0.2);
+                            const navDelay = getHumanLikeDelay(CONFIG.CRAWLER.delayBeforeNavigation, 0.1);
                             await page.waitForTimeout(navDelay);
                             
                             doctorPage = await page.context().newPage();
@@ -324,16 +324,16 @@ const crawler = new PlaywrightCrawler({
                             
                             try {
                                 await doctorPage.goto(doctor.url, { 
-                                    waitUntil: 'networkidle',
-                                    timeout: 45000
+                                    waitUntil: 'domcontentloaded',
+                                    timeout: 20000
                                 });
                             } catch (navigationError) {
                                 try {
                                     await doctorPage.goto(doctor.url, { 
-                                        waitUntil: 'domcontentloaded',
-                                        timeout: 30000
+                                        waitUntil: 'load',
+                                        timeout: 15000
                                     });
-                                    await doctorPage.waitForTimeout(3000);
+                                    await doctorPage.waitForTimeout(1000);
                                 } catch (fallbackError) {
                                     throw fallbackError;
                                 }
@@ -349,7 +349,7 @@ const crawler = new PlaywrightCrawler({
                             }
                             
                             // Human-like delay after page load
-                            const loadDelay = getHumanLikeDelay(CONFIG.CRAWLER.delayAfterPageLoad, 0.2);
+                            const loadDelay = getHumanLikeDelay(CONFIG.CRAWLER.delayAfterPageLoad, 0.1);
                             await doctorPage.waitForTimeout(loadDelay);
                             
                             // Simulate human interaction on the page
@@ -403,7 +403,7 @@ const crawler = new PlaywrightCrawler({
                                 await doctorPage.close();
                             }
                             // Human-like delay after processing each doctor
-                            const processingDelay = getHumanLikeDelay(100, 0.2);
+                            const processingDelay = getHumanLikeDelay(50, 0.1);
                             await page.waitForTimeout(processingDelay);
                         }
                     }
@@ -415,7 +415,7 @@ const crawler = new PlaywrightCrawler({
                             currentPage++;
                             console.log(`\n➡️ Next page: ${currentPage}`);
                             // Human-like delay for pagination
-                            const paginationDelay = getHumanLikeDelay(CONFIG.CRAWLER.ajaxPaginationDelay, 0.3);
+                            const paginationDelay = getHumanLikeDelay(CONFIG.CRAWLER.ajaxPaginationDelay, 0.1);
                             await page.waitForTimeout(paginationDelay);
                         } else {
                             console.log(`\n🏁 No more pages`);

@@ -44,11 +44,11 @@ export const CONFIG = {
     CRAWLER: {
         maxRequestsPerCrawl: -1, // Lower for local testing, use -1 for unlimited crawling
         headless: true, // Set to false for local debugging
-        timeout: 15000, // Request timeout in milliseconds (reduced from 30s to 15s)
-        delayBetweenLinks: 200, // Delay in milliseconds between processing each doctor link (further reduced from 500ms)
-        delayBeforeNavigation: 200, // Delay before navigating to each doctor page (further reduced from 500ms)
-        delayAfterPageLoad: 500, // Delay after page loads to ensure stability (further reduced from 1000ms)
-        ajaxPaginationDelay: 1000, // Extra delay for AJAX pagination (further reduced from 2000ms)
+        timeout: 10000, // Request timeout in milliseconds (further reduced from 15s to 10s)
+        delayBetweenLinks: 100, // Delay in milliseconds between processing each doctor link (further reduced from 200ms)
+        delayBeforeNavigation: 100, // Delay before navigating to each doctor page (further reduced from 200ms)
+        delayAfterPageLoad: 200, // Delay after page loads to ensure stability (further reduced from 500ms)
+        ajaxPaginationDelay: 500, // Extra delay for AJAX pagination (further reduced from 1000ms)
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         labels: {
             DETAIL: 'DETAIL',
