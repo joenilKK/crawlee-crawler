@@ -59,52 +59,20 @@ if (!input.outputFilename || input.outputFilename.trim() === '') {
     throw new Error(errorMessage);
 }
 
-// Import local configuration for hardcoded values
-const { LOCAL_CONFIG } = await import('./config/local-config.js');
+// Import configuration from config.js
+const { CONFIG: BASE_CONFIG } = await import('./config/config.js');
 
-// Create configuration object using local config with output filename from input
+// Create configuration object using base config with output filename from input
 const CONFIG = {
-    SITE: {
-        name: LOCAL_CONFIG.siteName,
-        baseUrl: LOCAL_CONFIG.baseUrl,
-        startUrl: LOCAL_CONFIG.startUrl,
-        allowedUrlPatterns: LOCAL_CONFIG.allowedUrlPatterns,
-        excludedUrlPatterns: LOCAL_CONFIG.excludedUrlPatterns || [],
-        pagination: {
-            type: LOCAL_CONFIG.paginationType,
-            queryPattern: LOCAL_CONFIG.queryPattern || 'page={page}',
-            pathPattern: LOCAL_CONFIG.pathPattern || '/page/{page}/',
-            baseUrl: LOCAL_CONFIG.paginationBaseUrl || null,
-            startPage: LOCAL_CONFIG.startPage || 1
-        }
-    },
-    SELECTORS: {
-        specialistLinks: LOCAL_CONFIG.specialistLinksSelector,
-        nextButton: LOCAL_CONFIG.nextButtonSelector,
-        nextButtonContainer: LOCAL_CONFIG.nextButtonContainerSelector,
-        doctorName: LOCAL_CONFIG.doctorNameSelector,
-        contactLinks: LOCAL_CONFIG.contactLinksSelector,
-        tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr'
-    },
-    CRAWLER: {
-        maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl,
-        headless: LOCAL_CONFIG.headless,
-        timeout: LOCAL_CONFIG.timeout,
-        labels: {
-            DETAIL: 'DETAIL',
-            SPECIALISTS_LIST: 'SPECIALISTS_LIST'
-        }
-    },
+    ...BASE_CONFIG,
     OUTPUT: {
         getFilename: () => {
             if (input.outputFilename && input.outputFilename.trim() !== '') {
                 return input.outputFilename.endsWith('.json') ? input.outputFilename : `${input.outputFilename}.json`;
             }
-            const today = new Date().toISOString().split('T')[0];
-            return `memc-specialists-${today}.json`;
+            return BASE_CONFIG.OUTPUT.getFilename();
         }
-    },
-    COOKIES: LOCAL_CONFIG.cookies || [],
+    }
 };
 
 console.log('Starting crawler with configuration:', {

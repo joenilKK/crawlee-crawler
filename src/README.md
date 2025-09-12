@@ -1,4 +1,4 @@
-# Mount Elizabeth Crawler - Modular Structure
+# OpenGovSG Crawler - Modular Structure
 
 ## 📁 Folder Organization
 
@@ -85,7 +85,7 @@ SELECTORS: {
 
 ## 📊 Output
 
-Data is saved as: `mountelizabeth-specialists-YYYY-MM-DD.json`
+Data is saved as: `mtalvernia-scraped-data.json`
 
 Contains:
 - Site metadata
