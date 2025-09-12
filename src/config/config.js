@@ -31,7 +31,7 @@ export const CONFIG = {
         // Specialist listing page selectors
         specialistLinks: '.specialist-list a.thumbnail',
         nextButton: '.pagination .pagination-next a',
-        nextButtonContainer: '.paginationt',
+        nextButtonContainer: '.pagination',
         specialty: '.desktop h2.speciality a',
         
         // Specialist detail page selectors
