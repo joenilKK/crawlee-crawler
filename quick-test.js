@@ -12,7 +12,6 @@ const quickTest = async () => {
             }
         },
         requestHandler: async ({ page }) => {
-            console.log('🔍 Analyzing MEMC specialist page...');
             
             // Wait for page load
             await page.waitForTimeout(3000);

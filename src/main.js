@@ -1,4 +1,5 @@
 import { PlaywrightCrawler } from 'crawlee';
+import { BrowserName, DeviceCategory, OperatingSystemsName } from '@crawlee/browser-pool';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { handlePagination, handleInitialPagination, handleAjaxPagination } from './handlers/paginationHandler.js';
@@ -163,11 +164,15 @@ const crawler = new PlaywrightCrawler({
         useFingerprints: true,
         fingerprintOptions: {
             fingerprintGeneratorOptions: {
-                locales: browserFingerprint.languages,
-                devices: ['desktop'],
-                operatingSystems: [browserFingerprint.platform === 'Win32' ? 'windows' : 'macos'],
-                browsers: ['chrome']
-            }
+                browsers: [
+                    {
+                        name: BrowserName.edge,
+                        minVersion: 96,
+                    },
+                ],
+                devices: [DeviceCategory.desktop],
+                operatingSystems: [OperatingSystemsName.windows],
+            },
         },
         preLaunchHooks: [
             async (pageId, launchContext) => {
@@ -223,11 +228,13 @@ const crawler = new PlaywrightCrawler({
         }
     },
     // Add delays between requests to avoid being detected as a bot
-    requestHandlerTimeoutSecs: 1000, // Increased to 1000 seconds for longer processing
+    requestHandlerTimeoutSecs: 300, // Increased to 60 seconds for longer processing
     navigationTimeoutSecs: 20, // Further reduced to 20 seconds
     // Add random delays between requests
     minConcurrency: 1,
     maxConcurrency: 1,
+    // Enable retry on blocked requests
+    retryOnBlocked: true,
     // Handle failed requests with retry logic
     failedRequestHandler: async ({ request, error }) => {
         console.log(`❌ Failed: ${request.url}`);
@@ -268,7 +275,6 @@ const crawler = new PlaywrightCrawler({
             const maxConsecutiveFailures = 5;
             
             while (hasMorePages) {
-                console.log(`\n📄 Page ${currentPage}`);
                 
                 try {
                     await page.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
@@ -281,7 +287,6 @@ const crawler = new PlaywrightCrawler({
                         }));
                     }, CONFIG.SELECTORS.specialistLinks);
                     
-                    console.log(`Found ${doctorLinks.length} doctors`);
                     
                      for (let i = 0; i < doctorLinks.length; i++) {
                         const doctor = doctorLinks[i];
@@ -299,7 +304,6 @@ const crawler = new PlaywrightCrawler({
                             doctor.url.toLowerCase().includes('mailto:') ||
                             doctor.url.toLowerCase().includes('tel:') ||
                             !doctor.url.startsWith('http')) {
-                            console.log(`⏭️ Invalid URL`);
                             continue;
                         }
                         
@@ -379,10 +383,8 @@ const crawler = new PlaywrightCrawler({
                                 const bodyPreview = await doctorPage.evaluate(() => {
                                     return document.body.textContent.trim().substring(0, 200).replace(/\s+/g, ' ');
                                 });
-                                console.log(`📄 Preview: ${bodyPreview}...`);
                             } else {
                                 consecutiveFailures++;
-                                console.log(`❌ Not saved (${consecutiveFailures}/${maxConsecutiveFailures} failures)`);
                                 
                                 if (consecutiveFailures >= maxConsecutiveFailures) {
                                     hasMorePages = false;
@@ -392,7 +394,6 @@ const crawler = new PlaywrightCrawler({
                             
                         } catch (error) {
                             consecutiveFailures++;
-                            console.log(`❌ Error: ${error.message.substring(0, 100)}`);
                             
                             if (consecutiveFailures >= maxConsecutiveFailures) {
                                 hasMorePages = false;

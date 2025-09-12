@@ -12,7 +12,6 @@ const debugSelectors = async () => {
             }
         },
         requestHandler: async ({ page }) => {
-            console.log('🔍 Enhanced selector debugging for MEMC specialist page...');
             
             // Wait for page load
             await page.waitForTimeout(5000);
@@ -48,14 +47,11 @@ const debugSelectors = async () => {
                 '.main-content a[href*="specialist"]'
             ];
             
-            console.log('\n🧪 Testing different selector patterns:');
-            console.log('=' .repeat(60));
             
             for (const selector of selectorTests) {
                 try {
                     const elements = await page.$$(selector);
                     if (elements.length > 0) {
-                        console.log(`✅ "${selector}" found ${elements.length} elements`);
                         
                         // Get details of first few elements
                         const details = await page.evaluate((sel) => {
@@ -68,21 +64,13 @@ const debugSelectors = async () => {
                         }, selector);
                         
                         details.forEach((detail, i) => {
-                            console.log(`   ${i + 1}. "${detail.text}" (class: "${detail.className}")`);
-                            console.log(`      URL: ${detail.href}`);
                         });
-                        console.log('');
                     } else {
-                        console.log(`❌ "${selector}" found 0 elements`);
                     }
                 } catch (error) {
-                    console.log(`⚠️ "${selector}" error: ${error.message}`);
                 }
             }
             
-            // Look for any elements with "specialist" or "doctor" in their attributes
-            console.log('\n🔍 Searching for elements containing "specialist" or "doctor":');
-            console.log('=' .repeat(60));
             
             const specialistElements = await page.evaluate(() => {
                 const allElements = document.querySelectorAll('*');
@@ -113,23 +101,6 @@ const debugSelectors = async () => {
                 return matches.slice(0, 10); // First 10 matches
             });
             
-            if (specialistElements.length > 0) {
-                console.log(`Found ${specialistElements.length} potential specialist links:`);
-                specialistElements.forEach((el, i) => {
-                    console.log(`${i + 1}. "${el.text}"`);
-                    console.log(`   URL: ${el.href}`);
-                    console.log(`   Class: "${el.className}"`);
-                    console.log(`   ID: "${el.id}"`);
-                    console.log('');
-                });
-            } else {
-                console.log('No elements found containing "specialist" or "doctor"');
-            }
-            
-            // Check page structure
-            console.log('\n🏗️ Page structure analysis:');
-            console.log('=' .repeat(60));
-            
             const structure = await page.evaluate(() => {
                 return {
                     hasSpecialistList: !!document.querySelector('.specialist-list'),
@@ -151,19 +122,6 @@ const debugSelectors = async () => {
                         exists: !!document.querySelector(sel)
                     }))
                 };
-            });
-            
-            console.log(`Body classes: "${structure.bodyClasses}"`);
-            console.log(`Total links on page: ${structure.totalLinks}`);
-            console.log(`Has .specialist-list: ${structure.hasSpecialistList}`);
-            console.log(`Has .doctor-card: ${structure.hasDoctorCard}`);
-            console.log(`Has .profile-card: ${structure.hasProfileCard}`);
-            console.log(`Has .thumbnail: ${structure.hasThumbnail}`);
-            console.log(`Has .card: ${structure.hasCard}`);
-            
-            console.log('\nMain content containers:');
-            structure.mainContentSelectors.forEach(item => {
-                console.log(`  ${item.selector}: ${item.exists ? '✅' : '❌'}`);
             });
             
             console.log('\n⏳ Browser staying open for 30 seconds for manual inspection...');
