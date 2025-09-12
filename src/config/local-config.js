@@ -34,7 +34,7 @@ export const LOCAL_CONFIG = {
     unitNumber: '.unit-no .unit',
     
     // Crawler settings
-    maxRequestsPerCrawl: 4, // Lower for local testing, use -1 for unlimited crawling
+    maxRequestsPerCrawl: -1, // Lower for local testing, use -1 for unlimited crawling
     headless: false, // Set to false for local debugging
     timeout: 10000, // Request timeout in milliseconds
     
