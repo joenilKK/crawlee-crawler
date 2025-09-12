@@ -41,7 +41,7 @@ export const CONFIG = {
 
     // Crawler settings
     CRAWLER: {
-        maxRequestsPerCrawl: 5, // Lower for local testing
+        maxRequestsPerCrawl: 1000, // Lower for local testing
         headless: false, // Set to false for local debugging
         timeout: 10000,
         scraperMode: false, // Set to true to enable scraper-only mode (no crawling/pagination)
