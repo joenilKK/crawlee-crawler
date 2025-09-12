@@ -52,13 +52,7 @@ function convertCookiesToPlaywrightFormat(cookies) {
 // Get configuration based on environment (Apify or local)
 const { input, isApify, Actor } = await getConfiguration();
 
-// Validate required input field
-if (input.maxRequestsPerCrawl === undefined || input.maxRequestsPerCrawl === null || 
-    (input.maxRequestsPerCrawl !== -1 && input.maxRequestsPerCrawl < 1)) {
-    const errorMessage = `❌ CONFIGURATION ERROR: maxRequestsPerCrawl is required and must be a positive integer or -1 for unlimited crawling.`;
-    console.error(errorMessage);
-    throw new Error(errorMessage);
-}
+// No input validation needed - all settings come from local config
 
 // Import local configuration for hardcoded values
 const { LOCAL_CONFIG } = await import('./config/local-config.js');
@@ -90,8 +84,8 @@ const CONFIG = {
         tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr'
     },
     CRAWLER: {
-        maxRequestsPerCrawl: input.maxRequestsPerCrawl,
-        headless: input.headless !== undefined ? input.headless : LOCAL_CONFIG.headless,
+        maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl,
+        headless: LOCAL_CONFIG.headless,
         timeout: LOCAL_CONFIG.timeout,
         userAgent: LOCAL_CONFIG.userAgent,
         labels: {
@@ -115,7 +109,7 @@ const CONFIG = {
             return `opengovsg-scraped-data-${today}.json`;
         }
     },
-    COOKIES: input.cookies && input.cookies.length > 0 ? input.cookies : (LOCAL_CONFIG.cookies || []),
+    COOKIES: LOCAL_CONFIG.cookies || [],
 };
 
 console.log('Starting crawler with configuration:', {

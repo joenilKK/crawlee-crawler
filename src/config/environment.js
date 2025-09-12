@@ -36,9 +36,6 @@ export async function getConfiguration() {
         
         // Convert local config to Apify input format
         const input = {
-            maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl,
-            cookies: LOCAL_CONFIG.cookies || [],
-            headless: LOCAL_CONFIG.headless,
             outputFilename: LOCAL_CONFIG.outputFilename || ''
         };
         
