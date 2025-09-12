@@ -6,14 +6,14 @@
 export const LOCAL_CONFIG = {
     // Site configuration - modify these for your target site
     siteName: 'MT Alvernia',
-    baseUrl: 'https://www.mountelizabeth.com.sg/',
-    startUrl: 'https://www.mountelizabeth.com.sg/',
+    baseUrl: 'https://www.memc.com.sg/',
+    startUrl: 'https://www.memc.com.sg/specialist/',
     allowedUrlPatterns: [
-      'https://www.mountelizabeth.com.sg/',
-      'https://www.mountelizabeth.com.sg/*'
+      'https://www.memc.com.sg/specialist/',
+      'https://www.memc.com.sg/specialist/*'
     ],
     excludedUrlPatterns: [
-      'https://www.mountelizabeth.com.sg/about/',
+      'https://www.memc.com.sg/specialist/about/',
     ],
     
     // Pagination settings
@@ -26,12 +26,13 @@ export const LOCAL_CONFIG = {
     // Selectors
     specialistLinksSelector: '.specialist-list a.thumbnail',
     nextButtonSelector: '.pagination .pagination-next a',
-    nextButtonContainerSelector: '.pagination',
+    specialty: '.desktop h2.speciality a',
+    nextButtonContainerSelector: '.paginationt',
     doctorNameSelector: '.desktop > h1',
     contactLinksSelector: '.left-sidebar ul li a',
     
     // Crawler settings
-    maxRequestsPerCrawl: 50, // Lower for local testing
+    maxRequestsPerCrawl: 5, // Lower for local testing
     headless: false, // Set to false for local debugging
     timeout: 10000, // Request timeout in milliseconds
     

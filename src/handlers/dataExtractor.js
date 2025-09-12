@@ -24,6 +24,39 @@ export async function extractDoctorName(page, config) {
     }
 }
 
+
+/**
+ * Extract specialty from specialist page
+ * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
+ * @returns {Promise<string>} Doctor specialty
+ */
+export async function extractSpecialty(page, config) {
+    try {
+        await page.waitForSelector(config.SELECTORS.specialty, { timeout: config.CRAWLER.timeout });
+        
+        const specialties = await page.evaluate((selector) => {
+            const specialtyElements = document.querySelectorAll(selector);
+            const specialtyList = [];
+            
+            specialtyElements.forEach(element => {
+                const specialty = element.textContent.trim();
+                if (specialty) {
+                    specialtyList.push(specialty);
+                }
+            });
+            
+            return specialtyList.length > 0 ? specialtyList : ['Specialty not found'];
+        }, config.SELECTORS.specialty);
+        
+        return specialties;
+    } catch (error) {
+        console.error('Error extracting specialty:', error);
+        return ['Specialty extraction failed'];
+    }
+}
+
+
 /**
  * Extract contact details from specialist page
  * @param {Page} page - Playwright page object
@@ -138,16 +171,19 @@ export async function extractSpecialistData(page, url, config) {
     
     try {
         const doctorName = await extractDoctorName(page, config);
+        const specialty = await extractSpecialty(page, config);
         const contactDetails = await extractContactDetails(page, config);
         
         const specialistData = {
             url: url,
             doctorName: doctorName,
+            specialty: specialty,
             contactDetails: contactDetails,
             extractedAt: new Date().toISOString()
         };
         
         console.log(`Extracted data for: ${doctorName}`);
+        console.log(`Specialty found: ${specialty}`);
         console.log(`Contact details found: ${contactDetails.length}`);
         
         return specialistData;

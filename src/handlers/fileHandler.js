@@ -33,6 +33,7 @@ export async function saveDataToFile(extractedData, config, originalCookies = nu
                 pageData.doctors.forEach(doctor => {
                     processedData.push({
                         "Dr Name": doctor.name,
+                        "Specialty": doctor.specialty,
                         "Position": doctor.position,
                         "links": doctor.links || []
                     });
@@ -48,8 +49,6 @@ export async function saveDataToFile(extractedData, config, originalCookies = nu
         totalRecords: totalRecords,
         mode: isScraperMode ? 'scraper' : 'crawler',
         data: processedData,
-        // Keep 'specialists' for backward compatibility
-        specialists: processedData,
         metadata: {
             crawledAt: new Date().toISOString(),
             sourceUrl: isScraperMode ? (config.SCRAPER?.urls?.[0] || config.SITE.startUrl) : config.SITE.startUrl,
