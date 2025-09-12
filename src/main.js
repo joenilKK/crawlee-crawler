@@ -102,12 +102,65 @@ const crawler = new PlaywrightCrawler({
     launchContext: {
         launchOptions: {
             headless: CONFIG.CRAWLER.headless,
-            ignoreHTTPSErrors: true
+            ignoreHTTPSErrors: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu',
+                '--disable-features=VizDisplayCompositor',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-field-trial-config',
+                '--disable-back-forward-cache',
+                '--disable-ipc-flooding-protection',
+                '--disable-hang-monitor',
+                '--disable-prompt-on-repost',
+                '--disable-sync',
+                '--disable-translate',
+                '--disable-windows10-custom-titlebar',
+                '--disable-features=TranslateUI',
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-images',
+                '--disable-javascript',
+                '--disable-web-security',
+                '--allow-running-insecure-content',
+                '--disable-features=VizDisplayCompositor',
+                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            ]
         }
     },
-    // Add pre-navigation handler to set cookies
+    // Add pre-navigation handler to set cookies and stealth mode
     preNavigationHooks: [
         async ({ page, request }) => {
+            // Randomly select user agent
+            const randomUserAgent = CONFIG.USER_AGENTS[Math.floor(Math.random() * CONFIG.USER_AGENTS.length)];
+            
+            // Set realistic headers and viewport
+            await page.setViewportSize({ width: 1366, height: 768 });
+            await page.setExtraHTTPHeaders({
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0',
+                'User-Agent': randomUserAgent
+            });
+
+            // Set user agent
+            await page.setUserAgent(randomUserAgent);
+
             // Set cookies before navigation if we have any
             if (playwrightCookies.length > 0) {
                 try {
@@ -117,6 +170,47 @@ const crawler = new PlaywrightCrawler({
                     console.warn(`⚠️ Failed to set some cookies: ${error.message}`);
                 }
             }
+
+            // Add stealth mode scripts
+            await page.addInitScript(() => {
+                // Remove webdriver property
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined,
+                });
+
+                // Mock plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5],
+                });
+
+                // Mock languages
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en'],
+                });
+
+                // Mock permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                );
+
+                // Mock chrome object
+                window.chrome = {
+                    runtime: {},
+                };
+
+                // Override the `plugins` property to use a custom getter
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5],
+                });
+
+                // Override the `languages` property to use a custom getter
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en'],
+                });
+            });
         }
     ],
     // Session pool options
@@ -124,26 +218,59 @@ const crawler = new PlaywrightCrawler({
         blockedStatusCodes: [], // Don't auto-block any status codes (including 403, 503)
         maxPoolSize: 1,
         sessionOptions: {
-            maxErrorScore: 10, // Higher tolerance for "errors" 
-            errorScoreDecrement: 0.5, // Slower error recovery
+            maxErrorScore: 15, // Higher tolerance for "errors" 
+            errorScoreDecrement: 0.3, // Slower error recovery
+            maxAgeSecs: 1800, // 30 minutes session lifetime
         }
     },
     // Add delays between requests to avoid being detected as a bot
-    requestHandlerTimeoutSecs: 60,
-    navigationTimeoutSecs: 30,
+    requestHandlerTimeoutSecs: 90,
+    navigationTimeoutSecs: 45,
     // Add random delays between requests
     minConcurrency: 1,
     maxConcurrency: 1,
-    // Handle failed requests
+    // Add proxy support (if available)
+    proxyConfiguration: process.env.APIFY_PROXY_GROUPS ? {
+        useApifyProxy: true,
+        apifyProxyGroups: process.env.APIFY_PROXY_GROUPS.split(','),
+        apifyProxyCountry: process.env.APIFY_PROXY_COUNTRY || 'US'
+    } : undefined,
+    // Handle failed requests with better retry logic
     failedRequestHandler: async ({ request, error }) => {
         console.error(`❌ Request failed: ${error.message}`);
+        
+        // Check if it's a network error that might be temporary
+        if (error.message.includes('net::ERR_HTTP_RESPONSE_CODE_FAILURE') || 
+            error.message.includes('net::ERR_CONNECTION_REFUSED') ||
+            error.message.includes('net::ERR_TIMED_OUT')) {
+            
+            console.log(`🔄 Retrying request after delay: ${request.url}`);
+            
+            // Add exponential backoff delay
+            const retryDelay = Math.min(30000, Math.pow(2, request.retryCount || 0) * 5000);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            
+            // Re-enqueue the request for retry
+            return request;
+        }
+        
+        // For other errors, don't retry
+        console.log(`❌ Giving up on request after ${request.retryCount || 0} retries: ${request.url}`);
     },
     requestHandler: async ({ page, request, enqueueLinks }) => {
-        // Add random delay between 2-5 seconds to mimic human behavior
-        const delay = Math.random() * 3000 + 2000;
+        // Add random delay between 3-8 seconds to mimic human behavior
+        const delay = Math.random() * 5000 + 3000;
         console.log(`⏱️ Waiting ${Math.round(delay)}ms before processing request`);
         await page.waitForTimeout(delay);
         console.log(`Processing: ${request.url}`);
+
+        // Add random mouse movements to simulate human behavior
+        try {
+            await page.mouse.move(Math.random() * 800 + 100, Math.random() * 600 + 100);
+            await page.waitForTimeout(Math.random() * 1000 + 500);
+        } catch (error) {
+            // Ignore mouse movement errors
+        }
         
         
         // Temporarily disable URL filtering for debugging
