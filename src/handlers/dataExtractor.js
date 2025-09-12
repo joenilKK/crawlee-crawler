@@ -303,7 +303,6 @@ export async function extractSpecialistData(page, url, config) {
             doctorname: 'Extraction failed',
             specialty: '',
             contact: [],
-            businessOverview: [],
             unitNumber: '',
             error: error.message,
             extractedAt: new Date().toISOString()
