@@ -14,8 +14,6 @@ export const LOCAL_CONFIG_OVERRIDE = {
     // doctorNameSelector: '.doctor-name h1',
     
     // Example: Debugging settings
-    // headless: false,
-    // maxRequestsPerCrawl: 5, // Use -1 for unlimited crawling
     // timeout: 15000,
     
     // Example: Different pagination
@@ -28,6 +26,5 @@ export const LOCAL_CONFIG_OVERRIDE = {
     // Example: Custom output
     // outputFilename: 'my-custom-output.json'
     
-    // Note: When running through Apify, only maxRequestsPerCrawl can be overridden
-    // All other settings are taken from local-config.js
+    // Note: All settings are taken from local-config.js
 };

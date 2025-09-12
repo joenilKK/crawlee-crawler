@@ -44,7 +44,7 @@ export const CONFIG = {
 
     // Crawler settings
     CRAWLER: {
-        maxRequestsPerCrawl: 200, // Use -1 for unlimited crawling - will be overridden by actor input
+        maxRequestsPerCrawl: -1, // Use -1 for unlimited crawling
         headless: true, // Set to true for production
         timeout: 10000,
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -62,6 +62,6 @@ export const CONFIG = {
         }
     },
 
-    // Cookies configuration (empty by default, can be added via input)
+    // Cookies configuration (empty by default)
     COOKIES: []
 };

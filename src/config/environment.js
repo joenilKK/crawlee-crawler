@@ -36,9 +36,6 @@ export async function getConfiguration() {
         
         // Convert local config to Apify input format
         const input = {
-            maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl,
-            cookies: LOCAL_CONFIG.cookies || [],
-            headless: LOCAL_CONFIG.headless,
             outputFilename: LOCAL_CONFIG.outputFilename || ''
         };
         
@@ -52,9 +49,8 @@ export async function getConfiguration() {
  * @param {Object} config - Configuration object
  * @param {Object} Actor - Apify Actor instance (null for local)
  * @param {boolean} isApify - Whether running in Apify
- * @param {Array} originalCookies - Original cookies from input (optional)
  */
-export async function handleDataOutput(data, config, Actor, isApify, originalCookies = null) {
+export async function handleDataOutput(data, config, Actor, isApify) {
     const summary = {
         totalRecords: data.length,
         siteName: config.SITE.name,
@@ -67,9 +63,7 @@ export async function handleDataOutput(data, config, Actor, isApify, originalCoo
         // Store results in Apify dataset
         await Actor.pushData({
             summary,
-            specialists: data,
-            // Include original cookies if provided
-            cookies: originalCookies && originalCookies.length > 0 ? originalCookies : undefined
+            specialists: data
         });
         console.log(`📊 Data stored in Apify dataset`);
     } else {

@@ -9,10 +9,9 @@ import path from 'path';
  * Save extracted data to JSON file
  * @param {Array} extractedData - Array of specialist data
  * @param {Object} config - Configuration object
- * @param {Array} originalCookies - Original cookies from input (optional)
  * @returns {Promise<string>} File path where data was saved
  */
-export async function saveDataToFile(extractedData, config, originalCookies = null) {
+export async function saveDataToFile(extractedData, config) {
     const filename = config.OUTPUT.getFilename();
     const filepath = path.join(process.cwd(), filename);
     
@@ -27,8 +26,7 @@ export async function saveDataToFile(extractedData, config, originalCookies = nu
             specialty: record.specialty,
             contact: record.contact,
             unitNumber: record.unitNumber,
-            // Include original cookies if provided
-            cookies: originalCookies && originalCookies.length > 0 ? originalCookies : undefined
+            // No cookies to include
         };
     });
     
