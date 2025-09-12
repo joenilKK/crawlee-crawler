@@ -228,7 +228,7 @@ const crawler = new PlaywrightCrawler({
         }
     },
     // Add delays between requests to avoid being detected as a bot
-    requestHandlerTimeoutSecs: 300, // Increased to 60 seconds for longer processing
+    requestHandlerTimeoutSecs: 1000, // Increased to 1000 seconds for longer processing
     navigationTimeoutSecs: 20, // Further reduced to 20 seconds
     // Add random delays between requests
     minConcurrency: 1,
