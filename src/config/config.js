@@ -7,14 +7,14 @@ export const CONFIG = {
     SITE: {
         name: 'MT Alvernia',
         baseUrl: 'https://www.memc.com.sg/',
-        startUrl: 'https://www.memc.com.sg/specialist/',
+        startUrl: 'https://www.memc.com.sg/specialists/',
         allowedUrlPatterns: [
-            'https://www.memc.com.sg/specialist/',
-            'https://www.memc.com.sg/specialist/*'
+            'https://www.memc.com.sg/specialists/',
+            'https://www.memc.com.sg/specialists/*'
         ],
         // Patterns to exclude (optional)
         excludedUrlPatterns: [
-            'https://www.memc.com.sg/specialist/about/',
+            'https://www.memc.com.sg/specialists/about/',
         ],
         // Pagination configuration
         pagination: {

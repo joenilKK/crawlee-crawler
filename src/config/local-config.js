@@ -7,13 +7,13 @@ export const LOCAL_CONFIG = {
     // Site configuration - modify these for your target site
     siteName: 'MT Alvernia',
     baseUrl: 'https://www.memc.com.sg/',
-    startUrl: 'https://www.memc.com.sg/specialist/',
+    startUrl: 'https://www.memc.com.sg/specialists/',
     allowedUrlPatterns: [
-      'https://www.memc.com.sg/specialist/',
-      'https://www.memc.com.sg/specialist/*'
+      'https://www.memc.com.sg/specialists/',
+      'https://www.memc.com.sg/specialists/*'
     ],
     excludedUrlPatterns: [
-      'https://www.memc.com.sg/specialist/about/',
+      'https://www.memc.com.sg/specialists/about/',
     ],
     
     // Pagination settings
