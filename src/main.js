@@ -158,8 +158,7 @@ const crawler = new PlaywrightCrawler({
                 'User-Agent': randomUserAgent
             });
 
-            // Set user agent
-            await page.setUserAgent(randomUserAgent);
+            // User agent is already set in launch options and HTTP headers
 
             // Set cookies before navigation if we have any
             if (playwrightCookies.length > 0) {
