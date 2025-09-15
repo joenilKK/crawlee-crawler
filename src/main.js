@@ -620,12 +620,13 @@ const crawler = new PlaywrightCrawler({
                     let listingBrowser = null;
                     let listingPage = null;
                     let entityLinks = [];
+                    let listingProxyUrl = null;
                     
                     try {
                         console.log(`🆕 Creating fresh browser for page ${currentPage}: ${currentPageUrl}`);
                         
                         // Get proxy configuration for listing page
-                        const listingProxyUrl = proxyManager.getNextProxy(CONFIG.PROXY?.rotation || 'perRequest');
+                        listingProxyUrl = proxyManager.getNextProxy(CONFIG.PROXY?.rotation || 'perRequest');
                         const listingProxyConfig = proxyManager.getPlaywrightProxyConfig(listingProxyUrl);
                         
                         const listingLaunchOptions = {
