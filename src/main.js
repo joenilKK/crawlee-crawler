@@ -1,4 +1,5 @@
 import { PlaywrightCrawler } from 'crawlee';
+import { BrowserName, DeviceCategory, OperatingSystemsName } from '@crawlee/browser-pool';
 import { chromium } from 'playwright';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
