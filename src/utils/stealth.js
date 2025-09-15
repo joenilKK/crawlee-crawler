@@ -26,15 +26,18 @@ export function getRealisticHeaders(userAgent) {
     const isChrome = userAgent.includes('Chrome');
     const isFirefox = userAgent.includes('Firefox');
     const isSafari = userAgent.includes('Safari') && !userAgent.includes('Chrome');
+    const isEdge = userAgent.includes('Edg');
     
     const baseHeaders = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'en-US,en;q=0.9,en-GB;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
         'DNT': '1',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
-        'User-Agent': userAgent
+        'User-Agent': userAgent,
+        'Referer': 'https://www.google.com/',
+        'Origin': 'https://opengovsg.com'
     };
     
     if (isChrome) {
@@ -42,21 +45,43 @@ export function getRealisticHeaders(userAgent) {
             ...baseHeaders,
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-Site': 'cross-site',
             'Sec-Fetch-User': '?1',
             'Cache-Control': 'max-age=0',
-            'sec-ch-ua': '"Chromium";v="131", "Not(A:Brand";v="24", "Google Chrome";v="131"',
+            'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
             'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"'
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-ch-ua-platform-version': '"15.0.0"',
+            'sec-ch-ua-arch': '"x86"',
+            'sec-ch-ua-bitness': '"64"',
+            'sec-ch-ua-model': '""',
+            'sec-ch-ua-full-version-list': '"Google Chrome";v="131.0.6778.85", "Chromium";v="131.0.6778.85", "Not_A Brand";v="24.0.0.0"'
+        };
+    } else if (isEdge) {
+        return {
+            ...baseHeaders,
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'cross-site',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+            'sec-ch-ua': '"Microsoft Edge";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-ch-ua-platform-version': '"15.0.0"',
+            'sec-ch-ua-arch': '"x86"',
+            'sec-ch-ua-bitness': '"64"',
+            'sec-ch-ua-model': '""'
         };
     } else if (isFirefox) {
         return {
             ...baseHeaders,
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-Site': 'cross-site',
             'Sec-Fetch-User': '?1',
-            'Cache-Control': 'max-age=0'
+            'Cache-Control': 'max-age=0',
+            'TE': 'trailers'
         };
     } else if (isSafari) {
         return {

@@ -64,32 +64,59 @@ async function applyStealthConfiguration(page, config) {
         try {
             if (typeof page.addInitScript === 'function') {
                 await page.addInitScript(() => {
-            // Override navigator properties
+            // Remove webdriver property completely
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined,
+                configurable: true
             });
+            
+            // Override automation indicators
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Object;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Proxy;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Reflect;
             
             // Override chrome detection
             window.chrome = {
-                runtime: {},
+                runtime: {
+                    onConnect: undefined,
+                    onMessage: undefined
+                },
                 loadTimes: function() {
+                    const now = performance.now();
                     return {
-                        requestTime: performance.now() - Math.random() * 1000,
-                        startLoadTime: performance.now() - Math.random() * 500,
-                        commitLoadTime: performance.now() - Math.random() * 300,
-                        finishDocumentLoadTime: performance.now() - Math.random() * 200,
-                        finishLoadTime: performance.now() - Math.random() * 100,
-                        firstPaintTime: performance.now() - Math.random() * 50,
+                        requestTime: now - Math.random() * 1000,
+                        startLoadTime: now - Math.random() * 500,
+                        commitLoadTime: now - Math.random() * 300,
+                        finishDocumentLoadTime: now - Math.random() * 200,
+                        finishLoadTime: now - Math.random() * 100,
+                        firstPaintTime: now - Math.random() * 50,
                         firstPaintAfterLoadTime: 0,
                         navigationType: 'Other'
                     };
                 },
                 csi: function() {
+                    const now = performance.now();
                     return {
-                        pageT: performance.now() - Math.random() * 1000,
-                        startE: performance.now() - Math.random() * 500,
+                        pageT: now - Math.random() * 1000,
+                        startE: now - Math.random() * 500,
                         tran: 15
                     };
+                },
+                app: {
+                    isInstalled: false,
+                    InstallState: {
+                        DISABLED: 'disabled',
+                        INSTALLED: 'installed',
+                        NOT_INSTALLED: 'not_installed'
+                    },
+                    RunningState: {
+                        CANNOT_RUN: 'cannot_run',
+                        READY_TO_RUN: 'ready_to_run',
+                        RUNNING: 'running'
+                    }
                 }
             };
             
@@ -101,33 +128,53 @@ async function applyStealthConfiguration(page, config) {
                     originalQuery(parameters)
             );
             
-            // Override plugins
+            // Override plugins with realistic data
             Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5].map(() => ({
-                    name: 'Chrome PDF Plugin',
-                    filename: 'internal-pdf-viewer',
-                    description: 'Portable Document Format'
-                })),
+                get: () => [
+                    {
+                        name: 'Chrome PDF Plugin',
+                        filename: 'internal-pdf-viewer',
+                        description: 'Portable Document Format',
+                        length: 1
+                    },
+                    {
+                        name: 'Chrome PDF Viewer',
+                        filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai',
+                        description: '',
+                        length: 1
+                    },
+                    {
+                        name: 'Native Client',
+                        filename: 'internal-nacl-plugin',
+                        description: '',
+                        length: 2
+                    }
+                ],
+                configurable: true
             });
             
             // Override languages
             Object.defineProperty(navigator, 'languages', {
                 get: () => ['en-US', 'en'],
+                configurable: true
             });
             
             // Override platform
             Object.defineProperty(navigator, 'platform', {
                 get: () => 'Win32',
+                configurable: true
             });
             
             // Override hardware concurrency
             Object.defineProperty(navigator, 'hardwareConcurrency', {
-                get: () => 4,
+                get: () => 8,
+                configurable: true
             });
             
             // Override device memory
             Object.defineProperty(navigator, 'deviceMemory', {
                 get: () => 8,
+                configurable: true
             });
             
             // Override connection
@@ -136,8 +183,13 @@ async function applyStealthConfiguration(page, config) {
                     effectiveType: '4g',
                     rtt: 50,
                     downlink: 10,
-                    saveData: false
+                    saveData: false,
+                    onchange: null,
+                    addEventListener: function() {},
+                    removeEventListener: function() {},
+                    dispatchEvent: function() { return true; }
                 }),
+                configurable: true
             });
             
             // Override battery API
@@ -146,29 +198,36 @@ async function applyStealthConfiguration(page, config) {
                     charging: true,
                     chargingTime: Infinity,
                     dischargingTime: Infinity,
-                    level: 0.8
+                    level: 0.8,
+                    onchargingchange: null,
+                    onchargingtimechange: null,
+                    ondischargingtimechange: null,
+                    onlevelchange: null,
+                    addEventListener: function() {},
+                    removeEventListener: function() {},
+                    dispatchEvent: function() { return true; }
                 });
             }
             
-            // Override WebGL
+            // Override WebGL with realistic values
             const getParameter = WebGLRenderingContext.prototype.getParameter;
             WebGLRenderingContext.prototype.getParameter = function(parameter) {
                 if (parameter === 37445) {
                     return 'Intel Inc.';
                 }
                 if (parameter === 37446) {
-                    return 'Intel(R) HD Graphics 620';
+                    return 'Intel(R) UHD Graphics 620';
                 }
-                return getParameter(parameter);
+                return getParameter.call(this, parameter);
             };
             
             // Override screen properties
-            Object.defineProperty(screen, 'availTop', { get: () => 0 });
-            Object.defineProperty(screen, 'availLeft', { get: () => 0 });
-            Object.defineProperty(screen, 'availWidth', { get: () => window.screen.width });
-            Object.defineProperty(screen, 'availHeight', { get: () => window.screen.height - 40 });
-            Object.defineProperty(screen, 'colorDepth', { get: () => 24 });
-            Object.defineProperty(screen, 'pixelDepth', { get: () => 24 });
+            Object.defineProperty(screen, 'availTop', { get: () => 0, configurable: true });
+            Object.defineProperty(screen, 'availLeft', { get: () => 0, configurable: true });
+            Object.defineProperty(screen, 'availWidth', { get: () => window.screen.width, configurable: true });
+            Object.defineProperty(screen, 'availHeight', { get: () => window.screen.height - 40, configurable: true });
+            Object.defineProperty(screen, 'colorDepth', { get: () => 24, configurable: true });
+            Object.defineProperty(screen, 'pixelDepth', { get: () => 24, configurable: true });
             
             // Override timezone
             const originalDate = Date;
@@ -187,10 +246,54 @@ async function applyStealthConfiguration(page, config) {
                 ]);
             }
             
-            // Override automation indicators
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+            // Override automation detection
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined,
+                configurable: true
+            });
+            
+            // Override automation flags
+            delete window.navigator.webdriver;
+            delete window.navigator.__webdriver_script_fn;
+            delete window.navigator.__webdriver_evaluate;
+            delete window.navigator.__webdriver_unwrapped;
+            delete window.navigator.__fxdriver_evaluate;
+            delete window.navigator.__driver_unwrapped;
+            delete window.navigator.__webdriver_script_func;
+            delete window.navigator.__selenium_unwrapped;
+            delete window.navigator.__selenium_evaluate;
+            delete window.navigator.__selenium_webdriver;
+            delete window.navigator.__fxdriver_unwrapped;
+            delete window.navigator.__driver_evaluate;
+            delete window.navigator.__webdriver_script_function;
+            
+            // Override automation properties
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined,
+                configurable: true
+            });
+            
+            // Override automation detection methods
+            if (window.document) {
+                Object.defineProperty(window.document, 'hidden', {
+                    get: () => false,
+                    configurable: true
+                });
+                Object.defineProperty(window.document, 'visibilityState', {
+                    get: () => 'visible',
+                    configurable: true
+                });
+            }
+            
+            // Override automation detection in window
+            Object.defineProperty(window, 'outerHeight', {
+                get: () => window.innerHeight,
+                configurable: true
+            });
+            Object.defineProperty(window, 'outerWidth', {
+                get: () => window.innerWidth,
+                configurable: true
+            });
         });
             } else {
                 console.warn('⚠️ addInitScript method not available on page');
@@ -220,25 +323,39 @@ async function applyStealthConfiguration(page, config) {
             const resourceType = route.request().resourceType();
             
             // Block ads, analytics, and tracking
-            if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication') || url.includes('analytics'))) {
+            if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication') || url.includes('analytics') || url.includes('gtag'))) {
                 route.abort();
                 return;
             }
             
             // Block social media trackers
-            if (url.includes('facebook.com') || url.includes('twitter.com') || url.includes('linkedin.com') || url.includes('instagram.com')) {
+            if (url.includes('facebook.com') || url.includes('twitter.com') || url.includes('linkedin.com') || url.includes('instagram.com') || url.includes('pinterest.com')) {
                 route.abort();
                 return;
             }
             
-            // Block fonts to reduce fingerprinting
-            if (resourceType === 'font') {
+            // Block common tracking domains
+            if (url.includes('googletagmanager.com') || url.includes('googlesyndication.com') || url.includes('google-analytics.com') || 
+                url.includes('facebook.net') || url.includes('twitter.com') || url.includes('linkedin.com') || 
+                url.includes('hotjar.com') || url.includes('mixpanel.com') || url.includes('segment.com')) {
                 route.abort();
                 return;
             }
             
-            // Block images to speed up loading (optional)
-            if (resourceType === 'image' && !url.includes('opengovsg.com')) {
+            // Block fonts to reduce fingerprinting (but allow system fonts)
+            if (resourceType === 'font' && !url.includes('fonts.googleapis.com') && !url.includes('fonts.gstatic.com')) {
+                route.abort();
+                return;
+            }
+            
+            // Block unnecessary media files
+            if (resourceType === 'media' && !url.includes('opengovsg.com')) {
+                route.abort();
+                return;
+            }
+            
+            // Block unnecessary scripts (but allow the main site)
+            if (resourceType === 'script' && (url.includes('google') || url.includes('facebook') || url.includes('twitter') || url.includes('linkedin'))) {
                 route.abort();
                 return;
             }
@@ -292,6 +409,69 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
             const launchOptions = {
                 headless: config.LOCAL_CONFIG?.headless !== false,
                 args: [
+                    // Core stealth arguments
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-blink-features=AutomationControlled',
+                    '--exclude-switches=enable-automation',
+                    '--disable-extensions-except=',
+                    '--disable-extensions',
+                    '--disable-plugins',
+                    '--disable-default-apps',
+                    '--disable-sync',
+                    '--disable-translate',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
+                    '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+                    '--disable-client-side-phishing-detection',
+                    '--disable-popup-blocking',
+                    '--disable-prompt-on-repost',
+                    '--disable-hang-monitor',
+                    '--disable-component-update',
+                    '--disable-background-networking',
+                    '--disable-background-sync',
+                    '--disable-device-discovery-notifications',
+                    '--disable-ipc-flooding-protection',
+                    '--no-default-browser-check',
+                    '--safebrowsing-disable-auto-update',
+                    '--password-store=basic',
+                    '--use-mock-keychain',
+                    '--metrics-recording-only',
+                    '--mute-audio',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu',
+                    '--disable-accelerated-2d-canvas',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor',
+                    '--memory-pressure-off',
+                    '--max_old_space_size=2048',
+                    '--no-crash-upload',
+                    '--disable-breakpad',
+                    '--disable-logging',
+                    '--disable-gpu-logging',
+                    '--disable-gpu-sandbox',
+                    '--disable-software-rasterizer',
+                    '--disable-background-mode',
+                    '--disable-background-media-suspend',
+                    '--disable-renderer-accessibility',
+                    '--disable-speech-api',
+                    '--disable-file-system',
+                    '--disable-permissions-api',
+                    '--disable-presentation-api',
+                    '--disable-remote-fonts',
+                    '--disable-sensors',
+                    '--disable-speech-synthesis-api',
+                    '--disable-webgl',
+                    '--disable-webgl2',
+                    '--disable-xss-auditor',
+                    '--disable-features=VizDisplayCompositor,AudioServiceOutOfProcess',
+                    '--force-color-profile=srgb',
+                    '--hide-scrollbars',
+                    '--mute-audio',
+                    '--no-pings',
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
@@ -323,20 +503,6 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
                     '--disable-background-sync',
                     '--disable-device-discovery-notifications',
                     '--disable-ipc-flooding-protection',
-                    '--disable-features=TranslateUI',
-                    '--disable-client-side-phishing-detection',
-                    '--disable-popup-blocking',
-                    '--disable-prompt-on-repost',
-                    '--no-default-browser-check',
-                    '--safebrowsing-disable-auto-update',
-                    '--password-store=basic',
-                    '--use-mock-keychain',
-                    '--metrics-recording-only',
-                    '--mute-audio',
-                    '--disable-features=TranslateUI',
-                    '--disable-client-side-phishing-detection',
-                    '--disable-popup-blocking',
-                    '--disable-prompt-on-repost',
                     '--no-default-browser-check',
                     '--safebrowsing-disable-auto-update',
                     '--password-store=basic',
@@ -845,16 +1011,26 @@ const crawler = new PlaywrightCrawler({
         retireBrowserAfterPageCount: LOCAL_CONFIG.browserRestartCount || 3, // Restart browser every N pages to prevent memory leaks
         fingerprintOptions: {
           fingerprintGeneratorOptions: {
-              browsers: [{
-                  name: BrowserName.edge,
-                  minVersion: 96,
-              }],
+              browsers: [
+                  {
+                      name: BrowserName.chrome,
+                      minVersion: 120,
+                      maxVersion: 131,
+                  },
+                  {
+                      name: BrowserName.edge,
+                      minVersion: 120,
+                      maxVersion: 131,
+                  }
+              ],
               devices: [
                   DeviceCategory.desktop,
               ],
               operatingSystems: [
                   OperatingSystemsName.windows,
               ],
+              locales: ['en-US', 'en-GB'],
+              timezones: ['Asia/Singapore', 'America/New_York', 'Europe/London'],
           },
       },
     },
@@ -864,8 +1040,10 @@ const crawler = new PlaywrightCrawler({
         blockedStatusCodes: [], // Don't auto-block any status codes (including 403, 503)
         maxPoolSize: 1,
         sessionOptions: {
-            maxErrorScore: 15, // Higher tolerance for "errors" 
-            errorScoreDecrement: 0.3, // Slower error recovery
+            maxErrorScore: 25, // Higher tolerance for "errors" 
+            errorScoreDecrement: 0.1, // Much slower error recovery
+            maxAgeSecs: 3600, // 1 hour session lifetime
+            maxUsageCount: 50, // Max requests per session
         }
     },
     // Enable retry on blocked requests
@@ -881,10 +1059,18 @@ const crawler = new PlaywrightCrawler({
         // Apply stealth configuration to main crawler page
         await applyStealthConfiguration(page, CONFIG);
         
-        // Add random delay between 2-5 seconds to mimic human behavior
-        const delay = Math.random() * 3000 + 2000;
+        // Add random delay between 3-8 seconds to mimic human behavior
+        const delay = Math.random() * 5000 + 3000;
         console.log(`⏱️ Waiting ${Math.round(delay)}ms before processing request`);
         await safeWaitForTimeout(page, delay);
+        
+        // Add human-like mouse movement before processing
+        try {
+            await page.mouse.move(Math.random() * 100, Math.random() * 100);
+            await page.waitForTimeout(Math.random() * 500 + 200);
+        } catch (mouseError) {
+            // Ignore mouse movement errors
+        }
         console.log(`Processing: ${request.url}`);
         
         // This is the main entry point - start sequential processing
@@ -965,26 +1151,69 @@ const crawler = new PlaywrightCrawler({
                         }
                         
                         // Navigate with retry logic for blocked requests
-                        const response = await listingPage.goto(currentPageUrl, { waitUntil: 'networkidle' });
+                        let response;
+                        let retryCount = 0;
+                        const maxRetries = 3;
                         
-                        // Check if request was blocked
-                        if (response && (response.status() === 403 || response.status() === 429 || response.status() === 503)) {
-                            const errorMsg = `Request blocked with status ${response.status()}`;
-                            console.warn(`⚠️ ${errorMsg} - This might be due to anti-bot detection`);
-                            
-                            // If it's a 403 error, try to get more information
-                            if (response.status() === 403) {
-                                try {
-                                    const pageContent = await listingPage.content();
-                                    if (pageContent.includes('blocked') || pageContent.includes('forbidden') || pageContent.includes('access denied')) {
-                                        console.warn('🔍 Listing page content suggests anti-bot blocking');
+                        while (retryCount < maxRetries) {
+                            try {
+                                response = await listingPage.goto(currentPageUrl, { 
+                                    waitUntil: 'networkidle',
+                                    timeout: 30000
+                                });
+                                
+                                // Check if request was blocked
+                                if (response && (response.status() === 403 || response.status() === 429 || response.status() === 503)) {
+                                    const errorMsg = `Request blocked with status ${response.status()}`;
+                                    console.warn(`⚠️ ${errorMsg} - This might be due to anti-bot detection (attempt ${retryCount + 1}/${maxRetries})`);
+                                    
+                                    // If it's a 403 error, try to get more information
+                                    if (response.status() === 403) {
+                                        try {
+                                            const pageContent = await listingPage.content();
+                                            if (pageContent.includes('blocked') || pageContent.includes('forbidden') || pageContent.includes('access denied')) {
+                                                console.warn('🔍 Listing page content suggests anti-bot blocking');
+                                            }
+                                        } catch (contentError) {
+                                            console.warn('⚠️ Could not analyze listing page content:', contentError.message);
+                                        }
                                     }
-                                } catch (contentError) {
-                                    console.warn('⚠️ Could not analyze listing page content:', contentError.message);
+                                    
+                                    if (retryCount < maxRetries - 1) {
+                                        // Wait longer before retry
+                                        const retryDelay = (retryCount + 1) * 10000; // 10s, 20s, 30s
+                                        console.log(`⏳ Waiting ${retryDelay}ms before retry...`);
+                                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                                        
+                                        // Try to refresh the page or navigate to a different URL first
+                                        try {
+                                            await listingPage.goto('about:blank', { waitUntil: 'load', timeout: 5000 });
+                                            await new Promise(resolve => setTimeout(resolve, 2000));
+                                        } catch (refreshError) {
+                                            // Ignore refresh errors
+                                        }
+                                        
+                                        retryCount++;
+                                        continue;
+                                    } else {
+                                        throw new Error(errorMsg);
+                                    }
+                                } else {
+                                    // Success - break out of retry loop
+                                    break;
+                                }
+                            } catch (error) {
+                                if (retryCount < maxRetries - 1) {
+                                    console.warn(`⚠️ Navigation failed (attempt ${retryCount + 1}/${maxRetries}): ${error.message}`);
+                                    const retryDelay = (retryCount + 1) * 5000; // 5s, 10s, 15s
+                                    console.log(`⏳ Waiting ${retryDelay}ms before retry...`);
+                                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                                    retryCount++;
+                                    continue;
+                                } else {
+                                    throw error;
                                 }
                             }
-                            
-                            throw new Error(errorMsg);
                         }
                         
                         await listingPage.waitForTimeout(2000);
