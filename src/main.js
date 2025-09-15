@@ -37,15 +37,33 @@ import {
 async function applyStealthConfiguration(page, config) {
     try {
         // Set realistic viewport
-        const viewport = getRandomViewport();
-        await page.setViewportSize(viewport);
+        try {
+            if (typeof page.setViewportSize === 'function') {
+                const viewport = getRandomViewport();
+                await page.setViewportSize(viewport);
+            } else {
+                console.warn('⚠️ setViewportSize method not available on page');
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not set viewport size:', error.message);
+        }
         
         // Set realistic headers
-        const headers = getRealisticHeaders(config.CRAWLER.userAgent);
-        await page.setExtraHTTPHeaders(headers);
+        try {
+            if (typeof page.setExtraHTTPHeaders === 'function') {
+                const headers = getRealisticHeaders(config.CRAWLER.userAgent);
+                await page.setExtraHTTPHeaders(headers);
+            } else {
+                console.warn('⚠️ setExtraHTTPHeaders method not available on page');
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not set extra HTTP headers:', error.message);
+        }
         
         // Inject stealth scripts to override browser detection
-        await page.addInitScript(() => {
+        try {
+            if (typeof page.addInitScript === 'function') {
+                await page.addInitScript(() => {
             // Override navigator properties
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined,
@@ -174,12 +192,30 @@ async function applyStealthConfiguration(page, config) {
             delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
             delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
         });
+            } else {
+                console.warn('⚠️ addInitScript method not available on page');
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not inject stealth scripts:', error.message);
+        }
         
-        // Set realistic user agent
-        await page.setUserAgent(config.CRAWLER.userAgent);
+        // Set realistic user agent (use context instead of page for Apify compatibility)
+        try {
+            if (typeof page.setUserAgent === 'function') {
+                await page.setUserAgent(config.CRAWLER.userAgent);
+            } else if (typeof page.context().setUserAgent === 'function') {
+                await page.context().setUserAgent(config.CRAWLER.userAgent);
+            } else {
+                console.warn('⚠️ setUserAgent method not available on page or context');
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not set user agent:', error.message);
+        }
         
         // Block unnecessary resources to reduce fingerprinting
-        await page.route('**/*', (route) => {
+        try {
+            if (typeof page.route === 'function') {
+                await page.route('**/*', (route) => {
             const url = route.request().url();
             const resourceType = route.request().resourceType();
             
@@ -209,6 +245,12 @@ async function applyStealthConfiguration(page, config) {
             
             route.continue();
         });
+            } else {
+                console.warn('⚠️ route method not available on page');
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not set up resource blocking:', error.message);
+        }
         
         console.log('🕵️ Stealth configuration applied successfully');
         
