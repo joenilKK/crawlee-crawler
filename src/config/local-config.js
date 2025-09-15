@@ -32,7 +32,7 @@ export const LOCAL_CONFIG = {
     tableRowsSelector: '.clinicdetailstable tbody tr', // Table rows for extracting address and other details
     
     // Crawler settings
-    maxRequestsPerCrawl: 5, // Use -1 for unlimited crawling in production, 4 for local testing
+    maxRequestsPerCrawl: -1, // Use -1 for unlimited crawling in production, 4 for local testing
     headless: false, // Set to false for local debugging
     timeout: 10000, // Request timeout in milliseconds
     
