@@ -433,14 +433,29 @@ const crawler = new PlaywrightCrawler({
     minConcurrency: 1,
     // Browser pool options for stability
     browserPoolOptions: {
-        useFingerprints: false,
+        useFingerprints: true,
         maxOpenPagesPerBrowser: 1, // Only one page per browser to prevent resource conflicts
         retireBrowserAfterPageCount: LOCAL_CONFIG.browserRestartCount || 3, // Restart browser every N pages to prevent memory leaks
+        fingerprintOptions: {
+          fingerprintGeneratorOptions: {
+              browsers: [{
+                  name: BrowserName.edge,
+                  minVersion: 96,
+              }],
+              devices: [
+                  DeviceCategory.desktop,
+              ],
+              operatingSystems: [
+                  OperatingSystemsName.windows,
+              ],
+          },
+      },
     },
     // Handle session pool configuration
     sessionPoolOptions: {
         blockedStatusCodes: [], // Don't auto-block any status codes (including 403, 503)
         maxPoolSize: 1,
+        retryOnBlocked: true,
         sessionOptions: {
             maxErrorScore: 15, // Higher tolerance for "errors" 
             errorScoreDecrement: 0.3, // Slower error recovery
