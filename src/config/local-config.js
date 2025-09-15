@@ -32,7 +32,7 @@ export const LOCAL_CONFIG = {
     contactLinksSelector: '.left-sidebar ul li a',
     
     // Crawler settings
-    maxRequestsPerCrawl: 5, // Lower for local testing
+    maxRequestsPerCrawl: 1000, // Lower for local testing
     headless: false, // Set to false for local debugging
     timeout: 10000, // Request timeout in milliseconds
     

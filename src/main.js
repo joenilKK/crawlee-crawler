@@ -59,6 +59,7 @@ if (input && input.outputFilename && input.outputFilename.trim() !== '') {
     CONFIG.OUTPUT.getFilename = () => {
         return input.outputFilename.endsWith('.json') ? input.outputFilename : `${input.outputFilename}.json`;
     };
+    console.log(`📁 Output filename set to: ${input.outputFilename}`);
 }
 
 console.log('Starting crawler with configuration:', {
@@ -114,7 +115,8 @@ if (playwrightCookies.length > 0) {
     console.log('Cookie domains:', [...new Set(playwrightCookies.map(c => c.domain))].join(', '));
 }
 
-const crawler = new PlaywrightCrawler({
+// Prepare crawler options
+const crawlerOptions = {
     launchContext: {
         launchOptions: {
             headless: CONFIG.CRAWLER.headless,
@@ -252,10 +254,22 @@ const crawler = new PlaywrightCrawler({
             // Handle pagination for the first page
             await handleInitialPagination(page, enqueueLinks, CONFIG);
         }
-    },
-    maxRequestsPerCrawl: CONFIG.CRAWLER.maxRequestsPerCrawl,
-    headless: CONFIG.CRAWLER.headless,
-});
+    }
+};
+
+// Handle maxRequestsPerCrawl logic
+if (CONFIG.CRAWLER.maxRequestsPerCrawl === -1) {
+    console.log('🚀 UNLIMITED CRAWLING MODE: Will crawl all pages until finished');
+    // Don't set maxRequestsPerCrawl for unlimited crawling
+} else {
+    console.log(`📊 Limited crawling mode: Max ${CONFIG.CRAWLER.maxRequestsPerCrawl} requests`);
+    crawlerOptions.maxRequestsPerCrawl = CONFIG.CRAWLER.maxRequestsPerCrawl;
+}
+
+// Add headless option
+crawlerOptions.headless = CONFIG.CRAWLER.headless;
+
+const crawler = new PlaywrightCrawler(crawlerOptions);
 
 await crawler.run([CONFIG.SITE.startUrl]);
 
