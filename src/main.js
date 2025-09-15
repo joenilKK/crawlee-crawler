@@ -325,7 +325,7 @@ const CONFIG = {
             maxPages: LOCAL_CONFIG.maxPages || 11
         }
     },
-    CRAWLER_TYPE: input.crawlerType || LOCAL_CONFIG.crawlerType || 'adaptive', // Use input, then local config, then default to adaptive
+    CRAWLER_TYPE: input.crawlerType || LOCAL_CONFIG.crawlerType || 'playwright-chrome', // Use input, then local config, then default to chrome
     SELECTORS: {
         specialistLinks: LOCAL_CONFIG.specialistLinksSelector,
         nextButton: LOCAL_CONFIG.nextButtonSelector,
@@ -403,6 +403,28 @@ function createCrawler(config) {
     const crawlerType = config.CRAWLER_TYPE || 'adaptive';
     console.log(`🔧 Creating crawler of type: ${crawlerType}`);
     
+    try {
+        return createCrawlerByType(config, crawlerType);
+    } catch (error) {
+        console.error(`❌ Failed to create ${crawlerType} crawler:`, error.message);
+        
+        // Fallback to Chrome if Firefox fails
+        if (crawlerType === 'playwright-firefox') {
+            console.log('🔄 Falling back to Chrome crawler');
+            return createCrawlerByType(config, 'playwright-chrome');
+        }
+        
+        // If Chrome also fails, try adaptive
+        if (crawlerType === 'playwright-chrome') {
+            console.log('🔄 Falling back to adaptive crawler');
+            return createCrawlerByType(config, 'adaptive');
+        }
+        
+        throw error;
+    }
+}
+
+function createCrawlerByType(config, crawlerType) {
     const commonOptions = {
         maxConcurrency: 1,
         minConcurrency: 1,
@@ -706,8 +728,6 @@ function createCrawler(config) {
             });
 
         case 'playwright-chrome':
-            // Deprecated - use Firefox instead
-            console.log('⚠️ Chrome crawler is deprecated, using Firefox instead');
             return new PlaywrightCrawler({
                 ...commonOptions,
                 launchContext: {
@@ -791,12 +811,12 @@ function createCrawler(config) {
 
         case 'adaptive':
         default:
-            // Use Playwright with Firefox as the default adaptive choice
-            console.log('🔄 Using adaptive crawler (Playwright Firefox)');
+            // Use Playwright with Chrome as the default adaptive choice
+            console.log('🔄 Using adaptive crawler (Playwright Chrome)');
             return new PlaywrightCrawler({
                 ...commonOptions,
                 launchContext: {
-                    launcher: firefox,
+                    launcher: chromium,
                     launchOptions: {
                         headless: config.CRAWLER.headless,
                         ignoreHTTPSErrors: true,
