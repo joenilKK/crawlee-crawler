@@ -434,7 +434,33 @@ const CONFIG = {
         blacklistFailedProxies: LOCAL_CONFIG.proxy?.blacklistFailedProxies !== false,
         blacklistDuration: LOCAL_CONFIG.proxy?.blacklistDuration || 300000,
         // Apify-specific proxy configuration
-        apifyProxyConfig: isApify && input.proxyConfiguration ? new ProxyConfiguration(input.proxyConfiguration) : null
+        apifyProxyConfig: isApify && input.proxyConfiguration ? (() => {
+            // Transform Apify input format to ProxyConfiguration format
+            const proxyConfig = {};
+            
+            // Map apifyProxyGroups to groups
+            if (input.proxyConfiguration.apifyProxyGroups) {
+                proxyConfig.groups = input.proxyConfiguration.apifyProxyGroups;
+            }
+            
+            // Map apifyProxyCountry to countryCode
+            if (input.proxyConfiguration.apifyProxyCountry) {
+                proxyConfig.countryCode = input.proxyConfiguration.apifyProxyCountry;
+            }
+            
+            // Add other valid properties if they exist
+            if (input.proxyConfiguration.rotation) {
+                proxyConfig.rotation = input.proxyConfiguration.rotation;
+            }
+            if (input.proxyConfiguration.retryCount) {
+                proxyConfig.retryCount = input.proxyConfiguration.retryCount;
+            }
+            if (input.proxyConfiguration.timeout) {
+                proxyConfig.timeout = input.proxyConfiguration.timeout;
+            }
+            
+            return new ProxyConfiguration(proxyConfig);
+        })() : null
     }
 };
 
