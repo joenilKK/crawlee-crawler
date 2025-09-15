@@ -292,10 +292,15 @@ function convertCookiesToPlaywrightFormat(cookies) {
 // Get configuration based on environment (Apify or local)
 const { input, isApify, Actor } = await getConfiguration();
 
-// Validate required input field
-if (input.maxRequestsPerCrawl === undefined || input.maxRequestsPerCrawl === null || 
-    (input.maxRequestsPerCrawl !== -1 && input.maxRequestsPerCrawl < 1)) {
-    const errorMessage = `❌ CONFIGURATION ERROR: maxRequestsPerCrawl is required and must be a positive integer or -1 for unlimited crawling.`;
+// Set default value for maxRequestsPerCrawl if not provided
+if (input.maxRequestsPerCrawl === undefined || input.maxRequestsPerCrawl === null) {
+    input.maxRequestsPerCrawl = -1; // Default to unlimited crawling
+    console.log('⚠️  maxRequestsPerCrawl not provided in input, defaulting to -1 (unlimited)');
+}
+
+// Validate maxRequestsPerCrawl value
+if (input.maxRequestsPerCrawl !== -1 && input.maxRequestsPerCrawl < 1) {
+    const errorMessage = `❌ CONFIGURATION ERROR: maxRequestsPerCrawl must be a positive integer or -1 for unlimited crawling.`;
     console.error(errorMessage);
     throw new Error(errorMessage);
 }
