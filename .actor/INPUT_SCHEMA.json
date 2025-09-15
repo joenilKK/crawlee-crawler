@@ -22,7 +22,6 @@
                     "title": "Enable Proxy",
                     "type": "boolean",
                     "description": "Enable proxy usage for requests",
-                    "default": false,
                     "editor": "checkbox"
                 },
                 "proxyUrls": {
@@ -49,7 +48,6 @@
                     "type": "string",
                     "description": "How to rotate between proxies",
                     "enum": ["perRequest", "perPage", "perSession"],
-                    "default": "perRequest",
                     "editor": "select"
                 },
                 "proxyRetryCount": {
@@ -58,7 +56,6 @@
                     "description": "Number of times to retry with different proxy on failure",
                     "minimum": 0,
                     "maximum": 10,
-                    "default": 3,
                     "editor": "number"
                 },
                 "proxyTimeout": {
@@ -67,7 +64,6 @@
                     "description": "Timeout for proxy connections in seconds",
                     "minimum": 5,
                     "maximum": 300,
-                    "default": 30,
                     "editor": "number"
                 }
             }
