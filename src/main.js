@@ -7,10 +7,215 @@ import { handlePagination, handleInitialPagination, handleAjaxPagination } from 
 import { shouldCrawlUrl } from './utils/helpers.js';
 import { ProxyManager } from './utils/proxyManager.js';
 import { 
+    getRealisticHeaders, 
+    getRandomViewport, 
+    getTimezoneOffset,
+    getHardwareInfo,
+    getScreenProperties,
+    getConnectionInfo,
+    getBatteryInfo,
+    getWebGLInfo,
+    getMediaDevices,
+    getChromeLoadTimes,
+    getChromeCSI,
+    addTimingJitter,
+    generateMousePath,
+    getTypingDelay,
+    getScrollBehavior
+} from './utils/stealth.js';
+import { 
     getConfiguration, 
     handleDataOutput, 
     handleExit 
 } from './config/environment.js';
+
+/**
+ * Apply comprehensive stealth configuration to a page
+ * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
+ */
+async function applyStealthConfiguration(page, config) {
+    try {
+        // Set realistic viewport
+        const viewport = getRandomViewport();
+        await page.setViewportSize(viewport);
+        
+        // Set realistic headers
+        const headers = getRealisticHeaders(config.CRAWLER.userAgent);
+        await page.setExtraHTTPHeaders(headers);
+        
+        // Inject stealth scripts to override browser detection
+        await page.addInitScript(() => {
+            // Override navigator properties
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined,
+            });
+            
+            // Override chrome detection
+            window.chrome = {
+                runtime: {},
+                loadTimes: function() {
+                    return {
+                        requestTime: performance.now() - Math.random() * 1000,
+                        startLoadTime: performance.now() - Math.random() * 500,
+                        commitLoadTime: performance.now() - Math.random() * 300,
+                        finishDocumentLoadTime: performance.now() - Math.random() * 200,
+                        finishLoadTime: performance.now() - Math.random() * 100,
+                        firstPaintTime: performance.now() - Math.random() * 50,
+                        firstPaintAfterLoadTime: 0,
+                        navigationType: 'Other'
+                    };
+                },
+                csi: function() {
+                    return {
+                        pageT: performance.now() - Math.random() * 1000,
+                        startE: performance.now() - Math.random() * 500,
+                        tran: 15
+                    };
+                }
+            };
+            
+            // Override permissions API
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+            
+            // Override plugins
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5].map(() => ({
+                    name: 'Chrome PDF Plugin',
+                    filename: 'internal-pdf-viewer',
+                    description: 'Portable Document Format'
+                })),
+            });
+            
+            // Override languages
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en'],
+            });
+            
+            // Override platform
+            Object.defineProperty(navigator, 'platform', {
+                get: () => 'Win32',
+            });
+            
+            // Override hardware concurrency
+            Object.defineProperty(navigator, 'hardwareConcurrency', {
+                get: () => 4,
+            });
+            
+            // Override device memory
+            Object.defineProperty(navigator, 'deviceMemory', {
+                get: () => 8,
+            });
+            
+            // Override connection
+            Object.defineProperty(navigator, 'connection', {
+                get: () => ({
+                    effectiveType: '4g',
+                    rtt: 50,
+                    downlink: 10,
+                    saveData: false
+                }),
+            });
+            
+            // Override battery API
+            if ('getBattery' in navigator) {
+                navigator.getBattery = () => Promise.resolve({
+                    charging: true,
+                    chargingTime: Infinity,
+                    dischargingTime: Infinity,
+                    level: 0.8
+                });
+            }
+            
+            // Override WebGL
+            const getParameter = WebGLRenderingContext.prototype.getParameter;
+            WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                if (parameter === 37445) {
+                    return 'Intel Inc.';
+                }
+                if (parameter === 37446) {
+                    return 'Intel(R) HD Graphics 620';
+                }
+                return getParameter(parameter);
+            };
+            
+            // Override screen properties
+            Object.defineProperty(screen, 'availTop', { get: () => 0 });
+            Object.defineProperty(screen, 'availLeft', { get: () => 0 });
+            Object.defineProperty(screen, 'availWidth', { get: () => window.screen.width });
+            Object.defineProperty(screen, 'availHeight', { get: () => window.screen.height - 40 });
+            Object.defineProperty(screen, 'colorDepth', { get: () => 24 });
+            Object.defineProperty(screen, 'pixelDepth', { get: () => 24 });
+            
+            // Override timezone
+            const originalDate = Date;
+            Date = class extends originalDate {
+                getTimezoneOffset() {
+                    return -480; // Singapore timezone
+                }
+            };
+            
+            // Override media devices
+            if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                navigator.mediaDevices.enumerateDevices = () => Promise.resolve([
+                    { deviceId: 'default', kind: 'audioinput', label: 'Default - Microphone', groupId: 'group1' },
+                    { deviceId: 'default', kind: 'audiooutput', label: 'Default - Speaker', groupId: 'group1' },
+                    { deviceId: 'camera1', kind: 'videoinput', label: 'Integrated Camera', groupId: 'group2' }
+                ]);
+            }
+            
+            // Override automation indicators
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+        });
+        
+        // Set realistic user agent
+        await page.setUserAgent(config.CRAWLER.userAgent);
+        
+        // Block unnecessary resources to reduce fingerprinting
+        await page.route('**/*', (route) => {
+            const url = route.request().url();
+            const resourceType = route.request().resourceType();
+            
+            // Block ads, analytics, and tracking
+            if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication') || url.includes('analytics'))) {
+                route.abort();
+                return;
+            }
+            
+            // Block social media trackers
+            if (url.includes('facebook.com') || url.includes('twitter.com') || url.includes('linkedin.com') || url.includes('instagram.com')) {
+                route.abort();
+                return;
+            }
+            
+            // Block fonts to reduce fingerprinting
+            if (resourceType === 'font') {
+                route.abort();
+                return;
+            }
+            
+            // Block images to speed up loading (optional)
+            if (resourceType === 'image' && !url.includes('opengovsg.com')) {
+                route.abort();
+                return;
+            }
+            
+            route.continue();
+        });
+        
+        console.log('🕵️ Stealth configuration applied successfully');
+        
+    } catch (error) {
+        console.warn('⚠️ Failed to apply some stealth configurations:', error.message);
+    }
+}
 
 /**
  * Extract data from a single entity using a fresh browser instance with retry logic
@@ -41,7 +246,7 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
                 proxyConfig = proxyManager.getPlaywrightProxyConfig(proxyUrl);
             }
             
-            // Create fresh browser instance with proxy if configured
+            // Create fresh browser instance with enhanced stealth options
             const launchOptions = {
                 headless: config.LOCAL_CONFIG?.headless !== false,
                 args: [
@@ -50,8 +255,8 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
                     '--disable-dev-shm-usage',
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
-                    '--disable-web-security', // Help prevent ad interference
-                    '--disable-features=VizDisplayCompositor', // Reduce ad rendering issues
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor',
                     '--no-zygote',
                     '--disable-gpu',
                     '--disable-background-timer-throttling',
@@ -64,7 +269,39 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
                     '--disable-extensions',
                     '--disable-plugins',
                     '--disable-default-apps',
-                    '--disable-sync'
+                    '--disable-sync',
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-features=TranslateUI',
+                    '--disable-client-side-phishing-detection',
+                    '--disable-popup-blocking',
+                    '--disable-prompt-on-repost',
+                    '--disable-hang-monitor',
+                    '--disable-component-update',
+                    '--disable-background-networking',
+                    '--disable-background-sync',
+                    '--disable-device-discovery-notifications',
+                    '--disable-ipc-flooding-protection',
+                    '--disable-features=TranslateUI',
+                    '--disable-client-side-phishing-detection',
+                    '--disable-popup-blocking',
+                    '--disable-prompt-on-repost',
+                    '--no-default-browser-check',
+                    '--safebrowsing-disable-auto-update',
+                    '--password-store=basic',
+                    '--use-mock-keychain',
+                    '--metrics-recording-only',
+                    '--mute-audio',
+                    '--disable-features=TranslateUI',
+                    '--disable-client-side-phishing-detection',
+                    '--disable-popup-blocking',
+                    '--disable-prompt-on-repost',
+                    '--no-default-browser-check',
+                    '--safebrowsing-disable-auto-update',
+                    '--password-store=basic',
+                    '--use-mock-keychain',
+                    '--metrics-recording-only',
+                    '--mute-audio',
+                    `--user-agent=${config.CRAWLER.userAgent}`
                 ]
             };
 
@@ -78,15 +315,18 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
             
             page = await browser.newPage();
             
-            // Block ads and trackers to prevent interference
-            await page.route('**/*', (route) => {
-                const url = route.request().url();
-                if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication'))) {
-                    route.abort();
-                } else {
-                    route.continue();
+            // Apply comprehensive stealth configuration
+            await applyStealthConfiguration(page, config);
+            
+            // Add cookies if available
+            if (config.COOKIES && config.COOKIES.length > 0) {
+                try {
+                    await page.context().addCookies(config.COOKIES);
+                    console.log(`🍪 Added ${config.COOKIES.length} cookies to fresh browser`);
+                } catch (cookieError) {
+                    console.warn('⚠️ Failed to add cookies:', cookieError.message);
                 }
-            });
+            }
             
             // Set timeouts
             page.setDefaultTimeout(config.LOCAL_CONFIG?.timeout || 10000);
@@ -98,7 +338,22 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
             
             // Check if request was blocked
             if (response && (response.status() === 403 || response.status() === 429 || response.status() === 503)) {
-                throw new Error(`Request blocked with status ${response.status()}`);
+                const errorMsg = `Request blocked with status ${response.status()}`;
+                console.warn(`⚠️ ${errorMsg} - This might be due to anti-bot detection`);
+                
+                // If it's a 403 error, try to get more information
+                if (response.status() === 403) {
+                    try {
+                        const pageContent = await page.content();
+                        if (pageContent.includes('blocked') || pageContent.includes('forbidden') || pageContent.includes('access denied')) {
+                            console.warn('🔍 Page content suggests anti-bot blocking');
+                        }
+                    } catch (contentError) {
+                        console.warn('⚠️ Could not analyze page content:', contentError.message);
+                    }
+                }
+                
+                throw new Error(errorMsg);
             }
             
             // Wait a bit for page to stabilize
@@ -516,7 +771,6 @@ const crawler = new PlaywrightCrawler({
                 '--disable-extensions',
                 '--disable-plugins',
                 '--disable-images',
-                '--enable-automation',
                 '--disable-default-apps',
                 '--disable-sync',
                 '--metrics-recording-only',
@@ -582,6 +836,9 @@ const crawler = new PlaywrightCrawler({
         console.error(`❌ Request failed: ${error.message}`);
     },
     requestHandler: async ({ page, request, enqueueLinks }) => {
+        // Apply stealth configuration to main crawler page
+        await applyStealthConfiguration(page, CONFIG);
+        
         // Add random delay between 2-5 seconds to mimic human behavior
         const delay = Math.random() * 3000 + 2000;
         console.log(`⏱️ Waiting ${Math.round(delay)}ms before processing request`);
@@ -652,22 +909,40 @@ const crawler = new PlaywrightCrawler({
                         listingPage = await listingBrowser.newPage();
                         listingPage.setDefaultTimeout(LOCAL_CONFIG?.timeout || 30000);
                         
-                        // Block ads and trackers to prevent interference
-                        await listingPage.route('**/*', (route) => {
-                            const url = route.request().url();
-                            if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication'))) {
-                                route.abort();
-                            } else {
-                                route.continue();
+                        // Apply stealth configuration to listing page
+                        await applyStealthConfiguration(listingPage, CONFIG);
+                        
+                        // Add cookies if available
+                        if (CONFIG.COOKIES && CONFIG.COOKIES.length > 0) {
+                            try {
+                                await listingPage.context().addCookies(CONFIG.COOKIES);
+                                console.log(`🍪 Added ${CONFIG.COOKIES.length} cookies to listing browser`);
+                            } catch (cookieError) {
+                                console.warn('⚠️ Failed to add cookies to listing browser:', cookieError.message);
                             }
-                        });
+                        }
                         
                         // Navigate with retry logic for blocked requests
                         const response = await listingPage.goto(currentPageUrl, { waitUntil: 'networkidle' });
                         
                         // Check if request was blocked
                         if (response && (response.status() === 403 || response.status() === 429 || response.status() === 503)) {
-                            throw new Error(`Request blocked with status ${response.status()}`);
+                            const errorMsg = `Request blocked with status ${response.status()}`;
+                            console.warn(`⚠️ ${errorMsg} - This might be due to anti-bot detection`);
+                            
+                            // If it's a 403 error, try to get more information
+                            if (response.status() === 403) {
+                                try {
+                                    const pageContent = await listingPage.content();
+                                    if (pageContent.includes('blocked') || pageContent.includes('forbidden') || pageContent.includes('access denied')) {
+                                        console.warn('🔍 Listing page content suggests anti-bot blocking');
+                                    }
+                                } catch (contentError) {
+                                    console.warn('⚠️ Could not analyze listing page content:', contentError.message);
+                                }
+                            }
+                            
+                            throw new Error(errorMsg);
                         }
                         
                         await listingPage.waitForTimeout(2000);
