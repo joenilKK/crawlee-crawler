@@ -55,7 +55,18 @@ export const LOCAL_CONFIG = {
         */
     ],
     
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    
+    // Proxy configuration for local development
+    proxyConfiguration: {
+        enabled: false,
+        proxies: [],
+        rotationStrategy: 'round_robin',
+        maxFailures: 3
+    },
+    maxRotationPerSession: 10,
+    maxRetries: 3,
+    maxRequestTimeout: 30
 };
 
 // You can override any of these settings by creating a local-config-override.js file

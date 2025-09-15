@@ -12,10 +12,13 @@ export class ProxyManager {
         this.currentProxyIndex = 0;
         this.failedProxies = new Set();
         this.proxyStats = new Map();
+        this.rotationCount = 0;
         this.config = {
             enabled: config.enabled || false,
             rotationStrategy: config.rotationStrategy || 'round_robin',
             maxFailures: config.maxFailures || 3,
+            maxRotationPerSession: config.maxRotationPerSession || 10,
+            maxRequestTimeout: config.maxRequestTimeout || 30,
             ...config
         };
     }
@@ -68,6 +71,12 @@ export class ProxyManager {
             return null;
         }
 
+        // Check if we've exceeded max rotations per session
+        if (this.rotationCount >= this.config.maxRotationPerSession) {
+            console.log(`🔄 Max rotations per session (${this.config.maxRotationPerSession}) reached`);
+            return null;
+        }
+
         // Filter out failed proxies
         const availableProxies = this.proxies.filter(proxy => 
             !this.failedProxies.has(proxy.id) && 
@@ -97,6 +106,7 @@ export class ProxyManager {
 
         if (selectedProxy) {
             selectedProxy.lastUsed = Date.now();
+            this.rotationCount++;
         }
 
         return selectedProxy;
@@ -176,6 +186,13 @@ export class ProxyManager {
     }
 
     /**
+     * Reset rotation count
+     */
+    resetRotationCount() {
+        this.rotationCount = 0;
+    }
+
+    /**
      * Get proxy statistics
      * @returns {Object} Statistics object
      */
@@ -188,7 +205,10 @@ export class ProxyManager {
             total,
             available,
             failed,
-            successRate: total > 0 ? this.proxies.reduce((sum, p) => sum + p.successRate, 0) / total : 0
+            successRate: total > 0 ? this.proxies.reduce((sum, p) => sum + p.successRate, 0) / total : 0,
+            rotationCount: this.rotationCount,
+            maxRotationPerSession: this.config.maxRotationPerSession,
+            maxRequestTimeout: this.config.maxRequestTimeout
         };
     }
 

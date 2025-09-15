@@ -128,7 +128,9 @@ const CONFIG = {
         enabled: input.proxyConfiguration?.enabled || false,
         proxies: input.proxyConfiguration?.proxies || [],
         rotationStrategy: input.proxyConfiguration?.rotationStrategy || 'round_robin',
-        maxFailures: input.proxyConfiguration?.maxFailures || 3
+        maxFailures: input.maxRetries || 3,
+        maxRotationPerSession: input.maxRotationPerSession || 10,
+        maxRequestTimeout: input.maxRequestTimeout || 30
     }
 };
 
@@ -245,8 +247,8 @@ const crawler = new PlaywrightCrawler({
         }
     },
     // Add delays between requests to avoid being detected as a bot
-    requestHandlerTimeoutSecs: 10000, // Increased to 1000 seconds for longer processing
-    navigationTimeoutSecs: 20, // Further reduced to 20 seconds
+    requestHandlerTimeoutSecs: CONFIG.PROXY.maxRequestTimeout * 1000, // Use maxRequestTimeout from input
+    navigationTimeoutSecs: CONFIG.PROXY.maxRequestTimeout, // Use maxRequestTimeout from input
     // Add random delays between requests
     minConcurrency: 1,
     maxConcurrency: 1,
@@ -267,7 +269,7 @@ const crawler = new PlaywrightCrawler({
         }
     },
     // Increase max retries but with specific conditions
-    maxRequestRetries: 5,
+    maxRequestRetries: CONFIG.PROXY.maxFailures,
     requestHandler: async ({ page, request, enqueueLinks }) => {
         const startTime = Date.now();
         console.log(`\n🔍 Processing: ${request.url}`);
@@ -486,6 +488,8 @@ if (CONFIG.PROXY.enabled) {
     console.log(`   Available proxies: ${proxyStats.available}`);
     console.log(`   Failed proxies: ${proxyStats.failed}`);
     console.log(`   Average success rate: ${(proxyStats.successRate * 100).toFixed(1)}%`);
+    console.log(`   Rotations used: ${proxyStats.rotationCount}/${proxyStats.maxRotationPerSession}`);
+    console.log(`   Max request timeout: ${proxyStats.maxRequestTimeout}s`);
 }
 
 // Save extracted data to JSON file

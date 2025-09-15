@@ -39,7 +39,11 @@ export async function getConfiguration() {
             maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl,
             cookies: LOCAL_CONFIG.cookies || [],
             headless: LOCAL_CONFIG.headless,
-            outputFilename: LOCAL_CONFIG.outputFilename || ''
+            outputFilename: LOCAL_CONFIG.outputFilename || '',
+            proxyConfiguration: LOCAL_CONFIG.proxyConfiguration || { enabled: false, proxies: [] },
+            maxRotationPerSession: LOCAL_CONFIG.maxRotationPerSession || 10,
+            maxRetries: LOCAL_CONFIG.maxRetries || 3,
+            maxRequestTimeout: LOCAL_CONFIG.maxRequestTimeout || 30
         };
         
         return { input, isApify: false, Actor: null };
