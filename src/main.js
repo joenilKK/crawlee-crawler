@@ -1,6 +1,6 @@
-import { PlaywrightCrawler, ProxyConfiguration } from 'crawlee';
+import { PlaywrightCrawler, CheerioCrawler, JSDOMCrawler, ProxyConfiguration } from 'crawlee';
 import { BrowserName, DeviceCategory, OperatingSystemsName } from '@crawlee/browser-pool';
-import { chromium } from 'playwright';
+import { chromium, firefox } from 'playwright';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { handlePagination, handleInitialPagination, handleAjaxPagination } from './handlers/paginationHandler.js';
@@ -849,6 +849,7 @@ const CONFIG = {
         tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr'
     },
     CRAWLER: {
+        type: input.crawlerType || LOCAL_CONFIG.crawlerType || 'playwright-firefox', // Use input crawlerType first
         maxRequestsPerCrawl: process.env.MAX_REQUESTS ? parseInt(process.env.MAX_REQUESTS) : LOCAL_CONFIG.maxRequestsPerCrawl,
         headless: LOCAL_CONFIG.headless,
         timeout: input.maxRequestTimeout ? input.maxRequestTimeout * 1000 : LOCAL_CONFIG.timeout, // Convert seconds to milliseconds
@@ -953,109 +954,287 @@ if (isApify && CONFIG.PROXY.apifyProxyConfig) {
     mainProxyConfig = proxyManager.getPlaywrightProxyConfig(mainProxyUrl);
 }
 
-const crawler = new PlaywrightCrawler({
-    // Use Apify proxy configuration if available
-    ...(apifyProxyConfig && { proxyConfiguration: apifyProxyConfig }),
-    launchContext: {
-        launchOptions: {
-            ignoreHTTPSErrors: true,
-            ...(mainProxyConfig.server && { proxy: mainProxyConfig }),
-            args: [
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-gpu',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-background-networking',
-                '--disable-background-sync',
-                '--disable-device-discovery-notifications',
-                '--disable-hang-monitor',
-                '--disable-component-update',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-images',
-                '--disable-default-apps',
-                '--disable-sync',
-                '--metrics-recording-only',
-                '--mute-audio',
-                '--no-default-browser-check',
-                '--no-first-run',
-                '--safebrowsing-disable-auto-update',
-                '--password-store=basic',
-                '--use-mock-keychain',
-                '--memory-pressure-off',
-                '--max_old_space_size=2048',
-                '--disable-ipc-flooding-protection',
-                '--disable-features=TranslateUI',
-                '--disable-client-side-phishing-detection',
-                '--disable-popup-blocking',
-                '--disable-prompt-on-repost',
-                '--no-crash-upload',
-                '--disable-breakpad',
-                `--user-agent=${CONFIG.CRAWLER.userAgent}`
-            ]
-        }
-    },
-    // Set lower concurrency to be respectful and stable
-    maxConcurrency: 1,
-    minConcurrency: 1,
-    // Browser pool options for stability
-    browserPoolOptions: {
-        useFingerprints: true,
-        maxOpenPagesPerBrowser: 1, // Only one page per browser to prevent resource conflicts
-        retireBrowserAfterPageCount: LOCAL_CONFIG.browserRestartCount || 3, // Restart browser every N pages to prevent memory leaks
-        fingerprintOptions: {
-          fingerprintGeneratorOptions: {
-              browsers: [
-                  {
-                      name: BrowserName.chrome,
-                      minVersion: 120,
-                      maxVersion: 131,
-                  },
-                  {
-                      name: BrowserName.edge,
-                      minVersion: 120,
-                      maxVersion: 131,
-                  }
-              ],
-              devices: [
-                  DeviceCategory.desktop,
-              ],
-              operatingSystems: [
-                  OperatingSystemsName.windows,
-              ],
-              locales: ['en-US', 'en-GB'],
-              timezones: ['Asia/Singapore', 'America/New_York', 'Europe/London'],
-          },
-      },
-    },
-    
-    // Handle session pool configuration
-    sessionPoolOptions: {
-        blockedStatusCodes: [], // Don't auto-block any status codes (including 403, 503)
-        maxPoolSize: 1,
-        sessionOptions: {
-            maxErrorScore: 25, // Higher tolerance for "errors" 
-            errorScoreDecrement: 0.1, // Much slower error recovery
-            maxAgeSecs: 3600, // 1 hour session lifetime
-            maxUsageCount: 50, // Max requests per session
-        }
-    },
-    // Enable retry on blocked requests
-    retryOnBlocked: true,
-    // Increase timeouts to prevent premature closures (increased for fresh browser approach)
-    requestHandlerTimeoutSecs: 3600, // 1 hour for the main handler (to handle all 1100+ entities)
-    navigationTimeoutSecs: 180, // 3 minutes for navigation
-    // Handle failed requests
-    failedRequestHandler: async ({ request, error }) => {
-        console.error(`❌ Request failed: ${error.message}`);
-    },
-    requestHandler: async ({ page, request, enqueueLinks }) => {
+/**
+ * Create the appropriate crawler based on the crawler type
+ * @param {string} crawlerType - The type of crawler to create
+ * @param {Object} config - Configuration object
+ * @param {Object} apifyProxyConfig - Apify proxy configuration
+ * @param {Object} mainProxyConfig - Main proxy configuration
+ * @returns {Object} The configured crawler instance
+ */
+function createCrawler(crawlerType, config, apifyProxyConfig, mainProxyConfig) {
+    const baseOptions = {
+        maxConcurrency: 1,
+        minConcurrency: 1,
+        requestHandlerTimeoutSecs: 3600, // 1 hour for the main handler
+        navigationTimeoutSecs: 180, // 3 minutes for navigation
+        sessionPoolOptions: {
+            blockedStatusCodes: [], // Don't auto-block any status codes
+            maxPoolSize: 1,
+            sessionOptions: {
+                maxErrorScore: 25,
+                errorScoreDecrement: 0.1,
+                maxAgeSecs: 3600,
+                maxUsageCount: 50,
+            }
+        },
+        retryOnBlocked: true,
+        failedRequestHandler: async ({ request, error }) => {
+            console.error(`❌ Request failed: ${error.message}`);
+        },
+        maxRequestsPerCrawl: config.CRAWLER.maxRequestsPerCrawl === -1 ? undefined : config.CRAWLER.maxRequestsPerCrawl,
+        headless: config.CRAWLER.headless,
+    };
+
+    switch (crawlerType) {
+        case 'playwright-firefox':
+            return new PlaywrightCrawler({
+                ...baseOptions,
+                ...(apifyProxyConfig && { proxyConfiguration: apifyProxyConfig }),
+                launchContext: {
+                    launchOptions: {
+                        ignoreHTTPSErrors: true,
+                        ...(mainProxyConfig.server && { proxy: mainProxyConfig }),
+                        args: [
+                            '--disable-web-security',
+                            '--disable-features=VizDisplayCompositor',
+                            '--disable-dev-shm-usage',
+                            '--no-sandbox',
+                            '--disable-setuid-sandbox',
+                            '--disable-gpu',
+                            '--disable-background-timer-throttling',
+                            '--disable-backgrounding-occluded-windows',
+                            '--disable-renderer-backgrounding',
+                            '--disable-background-networking',
+                            '--disable-background-sync',
+                            '--disable-device-discovery-notifications',
+                            '--disable-hang-monitor',
+                            '--disable-component-update',
+                            '--disable-blink-features=AutomationControlled',
+                            '--disable-extensions',
+                            '--disable-plugins',
+                            '--disable-images',
+                            '--disable-default-apps',
+                            '--disable-sync',
+                            '--metrics-recording-only',
+                            '--mute-audio',
+                            '--no-default-browser-check',
+                            '--no-first-run',
+                            '--safebrowsing-disable-auto-update',
+                            '--password-store=basic',
+                            '--use-mock-keychain',
+                            '--memory-pressure-off',
+                            '--max_old_space_size=2048',
+                            '--disable-ipc-flooding-protection',
+                            '--disable-features=TranslateUI',
+                            '--disable-client-side-phishing-detection',
+                            '--disable-popup-blocking',
+                            '--disable-prompt-on-repost',
+                            '--no-crash-upload',
+                            '--disable-breakpad',
+                            `--user-agent=${config.CRAWLER.userAgent}`
+                        ]
+                    }
+                },
+                browserPoolOptions: {
+                    useFingerprints: true,
+                    maxOpenPagesPerBrowser: 1,
+                    retireBrowserAfterPageCount: config.CRAWLER.browserRestartCount || 3,
+                    fingerprintOptions: {
+                        fingerprintGeneratorOptions: {
+                            browsers: [
+                                {
+                                    name: BrowserName.firefox,
+                                    minVersion: 120,
+                                    maxVersion: 131,
+                                }
+                            ],
+                            devices: [DeviceCategory.desktop],
+                            operatingSystems: [OperatingSystemsName.windows],
+                            locales: ['en-US', 'en-GB'],
+                            timezones: ['Asia/Singapore', 'America/New_York', 'Europe/London'],
+                        },
+                    },
+                },
+            });
+
+        case 'playwright-chrome':
+            return new PlaywrightCrawler({
+                ...baseOptions,
+                ...(apifyProxyConfig && { proxyConfiguration: apifyProxyConfig }),
+                launchContext: {
+                    launchOptions: {
+                        ignoreHTTPSErrors: true,
+                        ...(mainProxyConfig.server && { proxy: mainProxyConfig }),
+                        args: [
+                            '--disable-web-security',
+                            '--disable-features=VizDisplayCompositor',
+                            '--disable-dev-shm-usage',
+                            '--no-sandbox',
+                            '--disable-setuid-sandbox',
+                            '--disable-gpu',
+                            '--disable-background-timer-throttling',
+                            '--disable-backgrounding-occluded-windows',
+                            '--disable-renderer-backgrounding',
+                            '--disable-background-networking',
+                            '--disable-background-sync',
+                            '--disable-device-discovery-notifications',
+                            '--disable-hang-monitor',
+                            '--disable-component-update',
+                            '--disable-blink-features=AutomationControlled',
+                            '--disable-extensions',
+                            '--disable-plugins',
+                            '--disable-images',
+                            '--disable-default-apps',
+                            '--disable-sync',
+                            '--metrics-recording-only',
+                            '--mute-audio',
+                            '--no-default-browser-check',
+                            '--no-first-run',
+                            '--safebrowsing-disable-auto-update',
+                            '--password-store=basic',
+                            '--use-mock-keychain',
+                            '--memory-pressure-off',
+                            '--max_old_space_size=2048',
+                            '--disable-ipc-flooding-protection',
+                            '--disable-features=TranslateUI',
+                            '--disable-client-side-phishing-detection',
+                            '--disable-popup-blocking',
+                            '--disable-prompt-on-repost',
+                            '--no-crash-upload',
+                            '--disable-breakpad',
+                            `--user-agent=${config.CRAWLER.userAgent}`
+                        ]
+                    }
+                },
+                browserPoolOptions: {
+                    useFingerprints: true,
+                    maxOpenPagesPerBrowser: 1,
+                    retireBrowserAfterPageCount: config.CRAWLER.browserRestartCount || 3,
+                    fingerprintOptions: {
+                        fingerprintGeneratorOptions: {
+                            browsers: [
+                                {
+                                    name: BrowserName.chrome,
+                                    minVersion: 120,
+                                    maxVersion: 131,
+                                },
+                                {
+                                    name: BrowserName.edge,
+                                    minVersion: 120,
+                                    maxVersion: 131,
+                                }
+                            ],
+                            devices: [DeviceCategory.desktop],
+                            operatingSystems: [OperatingSystemsName.windows],
+                            locales: ['en-US', 'en-GB'],
+                            timezones: ['Asia/Singapore', 'America/New_York', 'Europe/London'],
+                        },
+                    },
+                },
+            });
+
+        case 'cheerio':
+            return new CheerioCrawler({
+                ...baseOptions,
+                ...(apifyProxyConfig && { proxyConfiguration: apifyProxyConfig }),
+                requestHandler: async ({ $, request, enqueueLinks }) => {
+                    // Cheerio-specific request handler
+                }
+            });
+
+        case 'jsdom':
+            return new JSDOMCrawler({
+                ...baseOptions,
+                ...(apifyProxyConfig && { proxyConfiguration: apifyProxyConfig }),
+                requestHandler: async ({ window, request, enqueueLinks }) => {
+                    // JSDOM-specific request handler
+                }
+            });
+
+        case 'adaptive':
+            // For adaptive mode, we'll start with Playwright and can switch to Cheerio if needed
+            console.log('🔄 Using adaptive crawler mode - starting with Playwright');
+            return new PlaywrightCrawler({
+                ...baseOptions,
+                ...(apifyProxyConfig && { proxyConfiguration: apifyProxyConfig }),
+                launchContext: {
+                    launchOptions: {
+                        ignoreHTTPSErrors: true,
+                        ...(mainProxyConfig.server && { proxy: mainProxyConfig }),
+                        args: [
+                            '--disable-web-security',
+                            '--disable-features=VizDisplayCompositor',
+                            '--disable-dev-shm-usage',
+                            '--no-sandbox',
+                            '--disable-setuid-sandbox',
+                            '--disable-gpu',
+                            '--disable-background-timer-throttling',
+                            '--disable-backgrounding-occluded-windows',
+                            '--disable-renderer-backgrounding',
+                            '--disable-background-networking',
+                            '--disable-background-sync',
+                            '--disable-device-discovery-notifications',
+                            '--disable-hang-monitor',
+                            '--disable-component-update',
+                            '--disable-blink-features=AutomationControlled',
+                            '--disable-extensions',
+                            '--disable-plugins',
+                            '--disable-images',
+                            '--disable-default-apps',
+                            '--disable-sync',
+                            '--metrics-recording-only',
+                            '--mute-audio',
+                            '--no-default-browser-check',
+                            '--no-first-run',
+                            '--safebrowsing-disable-auto-update',
+                            '--password-store=basic',
+                            '--use-mock-keychain',
+                            '--memory-pressure-off',
+                            '--max_old_space_size=2048',
+                            '--disable-ipc-flooding-protection',
+                            '--disable-features=TranslateUI',
+                            '--disable-client-side-phishing-detection',
+                            '--disable-popup-blocking',
+                            '--disable-prompt-on-repost',
+                            '--no-crash-upload',
+                            '--disable-breakpad',
+                            `--user-agent=${config.CRAWLER.userAgent}`
+                        ]
+                    }
+                },
+                browserPoolOptions: {
+                    useFingerprints: true,
+                    maxOpenPagesPerBrowser: 1,
+                    retireBrowserAfterPageCount: config.CRAWLER.browserRestartCount || 3,
+                    fingerprintOptions: {
+                        fingerprintGeneratorOptions: {
+                            browsers: [
+                                {
+                                    name: BrowserName.firefox,
+                                    minVersion: 120,
+                                    maxVersion: 131,
+                                }
+                            ],
+                            devices: [DeviceCategory.desktop],
+                            operatingSystems: [OperatingSystemsName.windows],
+                            locales: ['en-US', 'en-GB'],
+                            timezones: ['Asia/Singapore', 'America/New_York', 'Europe/London'],
+                        },
+                    },
+                },
+            });
+
+        default:
+            throw new Error(`Unsupported crawler type: ${crawlerType}`);
+    }
+}
+
+// Create the appropriate crawler based on the crawler type
+const crawler = createCrawler(CONFIG.CRAWLER.type, CONFIG, apifyProxyConfig, mainProxyConfig);
+
+// Add the main request handler to the crawler
+crawler.requestHandler = async ({ page, request, enqueueLinks }) => {
         // Apply stealth configuration to main crawler page
         await applyStealthConfiguration(page, CONFIG);
         
@@ -1408,10 +1587,8 @@ const crawler = new PlaywrightCrawler({
         } else {
             console.log(`⚠️ Only processed ${currentPage} pages - expected 11 pages`);
         }
-    },
-    maxRequestsPerCrawl: CONFIG.CRAWLER.maxRequestsPerCrawl === -1 ? undefined : CONFIG.CRAWLER.maxRequestsPerCrawl,
-    headless: CONFIG.CRAWLER.headless,
-});
+    }
+
 
 await crawler.run([CONFIG.SITE.startUrl]);
 

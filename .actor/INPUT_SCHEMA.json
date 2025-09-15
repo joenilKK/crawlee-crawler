@@ -4,6 +4,27 @@
     "type": "object",
     "schemaVersion": 1,
     "properties": {
+        "crawlerType": {
+            "title": "🤖 Crawler Type",
+            "type": "string",
+            "description": "Select the crawling engine that best suits your needs",
+            "enum": [
+                "adaptive",
+                "playwright-firefox",
+                "playwright-chrome",
+                "cheerio",
+                "jsdom"
+            ],
+            "enumTitles": [
+                "Adaptive switching between browser and raw HTTP",
+                "Headless browser (Firefox+Playwright)",
+                "Headless browser (Chrome+Playwright)",
+                "Raw HTTP client (Cheerio)",
+                "Raw HTTP client with JavaScript (JSDOM)"
+            ],
+            "default": "playwright-firefox",
+            "editor": "select"
+        },
         "outputFilename": {
             "title": "✅ Output Filename (REQUIRED)",
             "type": "string",

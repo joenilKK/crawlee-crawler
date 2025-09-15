@@ -33,6 +33,7 @@ export const CONFIG = {
     tableRowsSelector: '#overview.panel-card .panel-body .table tbody tr',
     
     // Crawler settings
+    crawlerType: 'playwright-firefox', // Default crawler type: 'adaptive', 'playwright-firefox', 'playwright-chrome', 'cheerio', 'jsdom'
     maxRequestsPerCrawl: -1, // Continue through ALL pages until pagination ends
     headless: true, // Set to true for production, false for debugging
     timeout: 100000, // Request timeout in milliseconds (increased for stability)
