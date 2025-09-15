@@ -47,9 +47,12 @@ export const LOCAL_CONFIG = {
         // Define selectors for doctor cards/containers
         doctorCards: '.doctor',
         doctorName: 'h4.doctor-name, .left h4',
+        clinicName: '.right .d-info-box:nth-child(1) p:nth-child(2)',
+        clinicAddress: '.left p:nth-child(2)',
         position: '.right > p',
         phoneLinks: '.tel_number a',
         Website: '.right p a',
+
         // You can add more custom selectors as needed
     },
     

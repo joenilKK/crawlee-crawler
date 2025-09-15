@@ -41,7 +41,7 @@ export const CONFIG = {
 
     // Crawler settings
     CRAWLER: {
-        maxRequestsPerCrawl: 3, // Lower for local testing
+        maxRequestsPerCrawl: -1, // Lower for local testing
         headless: false, // Set to false for local debugging
         timeout: 60000, // Increased timeout for manual interaction
         manualMode: true, // Enable manual mode for handling challenges
@@ -63,11 +63,13 @@ export const CONFIG = {
         // Custom data extraction selectors (for scraper mode)
         customSelectors: {
             // Define selectors for doctor cards/containers
-            doctorCards: '.doctor',
-            doctorName: 'h4.doctor-name, .left h4',
-            position: '.right > p',
-            phoneLinks: '.tel_number a',
-            Website: '.right p a',
+          doctorCards: '.doctor',
+          doctorName: 'h4.doctor-name, .left h4',
+          clinicName: '.right .d-info-box:nth-child(1) p:nth-child(2)',
+          clinicAddress: '.left p:nth-child(2)',
+          position: '.right > p',
+          phoneLinks: '.tel_number a',
+          Website: '.right p a',
             // You can add more custom selectors as needed
         }
     },

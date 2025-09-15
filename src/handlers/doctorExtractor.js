@@ -40,17 +40,23 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                 // Get all doctor names
                 const nameElements = document.querySelectorAll(selectors.doctorName);
                 const positionElements = document.querySelectorAll(selectors.position);
+                const clinicNameElements = document.querySelectorAll(selectors.clinicName);
+                const clinicAddressElements = document.querySelectorAll(selectors.clinicAddress);
                 const phoneElements = document.querySelectorAll(selectors.phoneLinks);
                 
                 // Match them by index (assuming they're in the same order)
                 for (let i = 0; i < nameElements.length; i++) {
                     const nameEl = nameElements[i];
                     const positionEl = positionElements[i];
+                    const clinicNameEl = clinicNameElements[i];
+                    const clinicAddressEl = clinicAddressElements[i];
                     
                     if (nameEl && nameEl.textContent.trim()) {
                         const doctorData = {
                             name: nameEl.textContent.trim(),
                             position: positionEl ? positionEl.textContent.trim() : '',
+                            clinicName: clinicNameEl ? clinicNameEl.textContent.trim() : '',
+                            clinicAddress: clinicAddressEl ? clinicAddressEl.textContent.trim() : '',
                             links: []
                         };
                         
@@ -124,6 +130,14 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                     const positionEl = card.querySelector(selectors.position);
                     const position = positionEl ? positionEl.textContent.trim() : '';
                     
+                    // Extract clinic name from within this card
+                    const clinicNameEl = card.querySelector(selectors.clinicName);
+                    const clinicName = clinicNameEl ? clinicNameEl.textContent.trim() : '';
+                    
+                    // Extract clinic address from within this card
+                    const clinicAddressEl = card.querySelector(selectors.clinicAddress);
+                    const clinicAddress = clinicAddressEl ? clinicAddressEl.textContent.trim() : '';
+                    
                     // Extract phone links from within this card
                     const phoneLinks = [];
                     const phoneElements = card.querySelectorAll(selectors.phoneLinks);
@@ -186,6 +200,8 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                         doctorsData.push({
                             name: name,
                             position: position,
+                            clinicName: clinicName,
+                            clinicAddress: clinicAddress,
                             links: phoneLinks,
                             website: website
                         });
@@ -201,6 +217,8 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
             doctorCards: doctorCards,
             doctorName: customSelectors.doctorName || '.doctor-name, .name, h3, h4, .title',
             position: customSelectors.position || '.specialty, .position, .department, p, .description',
+            clinicName: customSelectors.clinicName || '.clinic-name, .clinic, .facility',
+            clinicAddress: customSelectors.clinicAddress || '.clinic-address, .address, .location',
             phoneLinks: customSelectors.phoneLinks || '.tel_number a, a[href^="tel:"], .phone a, .contact a',
             Website: customSelectors.Website || ''
         });
@@ -214,7 +232,7 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
         if (doctors.length > 0) {
             console.log('📋 Sample doctors extracted:');
             doctors.slice(0, 3).forEach((doctor, index) => {
-                console.log(`   ${index + 1}. ${doctor.name} - ${doctor.position} (${doctor.links.length} phone numbers, website: ${doctor.website || 'none'})`);
+                console.log(`   ${index + 1}. ${doctor.name} - ${doctor.position} - ${doctor.clinicName || 'No clinic'} - ${doctor.clinicAddress || 'No address'} (${doctor.links.length} phone numbers, website: ${doctor.website || 'none'})`);
             });
         }
         
@@ -253,6 +271,8 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
                 if (!name || name.length < 3) return; // Skip empty or too short names
                 
                 let position = '';
+                let clinicName = '';
+                let clinicAddress = '';
                 let links = [];
                 
                 // Look for position in next sibling or nearby elements
@@ -283,12 +303,28 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
                     searchCount++;
                 }
                 
-                // Look for phone links and website in the vicinity
+                // Look for clinic name in the vicinity
                 let parentEl = nameEl.parentElement;
                 let parentSearchCount = 0;
                 let website = '';
                 
                 while (parentEl && parentSearchCount < 3) {
+                    // Look for clinic name
+                    if (selectors.clinicName) {
+                        const clinicEl = parentEl.querySelector(selectors.clinicName);
+                        if (clinicEl && clinicEl.textContent.trim()) {
+                            clinicName = clinicEl.textContent.trim();
+                        }
+                    }
+                    
+                    // Look for clinic address
+                    if (selectors.clinicAddress) {
+                        const clinicAddressEl = parentEl.querySelector(selectors.clinicAddress);
+                        if (clinicAddressEl && clinicAddressEl.textContent.trim()) {
+                            clinicAddress = clinicAddressEl.textContent.trim();
+                        }
+                    }
+                    
                     const phoneEls = parentEl.querySelectorAll(selectors.phoneLinks);
                     
                     phoneEls.forEach(phone => {
@@ -333,6 +369,8 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
                 doctorsData.push({
                     name: name,
                     position: position,
+                    clinicName: clinicName,
+                    clinicAddress: clinicAddress,
                     links: links,
                     website: website // Don't fallback to globalWebsite
                 });
@@ -343,6 +381,8 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
         }, {
             doctorName: customSelectors.doctorName || '.doctor-name, .name, h3, h4, .title',
             position: customSelectors.position || '.specialty, .position, .department, p, .description',
+            clinicName: customSelectors.clinicName || '.clinic-name, .clinic, .facility',
+            clinicAddress: customSelectors.clinicAddress || '.clinic-address, .address, .location',
             phoneLinks: customSelectors.phoneLinks || '.tel_number a, a[href^="tel:"], .phone a, .contact a',
             Website: customSelectors.Website || ''
         });
