@@ -123,6 +123,35 @@ export async function extractContactDetails(page, config) {
 }
 
 /**
+ * Extract clinic name from specialist page
+ * @param {Page} page - Playwright page object
+ * @param {Object} config - Configuration object
+ * @returns {Promise<string>} Clinic name
+ */
+export async function extractClinicName(page, config) {
+    try {
+        console.log(`Looking for clinic name with selector: ${config.SELECTORS.clinicName}`);
+        
+        const clinicName = await extractWithFallback(page, config.SELECTORS.clinicName, 'text');
+        
+        if (clinicName) {
+            console.log(`Found clinic name: ${clinicName}`);
+            // If we got an array, take the first non-empty result
+            if (Array.isArray(clinicName)) {
+                return clinicName.find(text => text && text.trim()) || '';
+            }
+            return clinicName;
+        }
+        
+        console.log('Clinic name not found with primary selector');
+        return '';
+    } catch (error) {
+        console.error('Error extracting clinic name:', error);
+        return '';
+    }
+}
+
+/**
  * Extract unit number from specialist page
  * @param {Page} page - Playwright page object
  * @param {Object} config - Configuration object
@@ -280,6 +309,7 @@ export async function extractSpecialistData(page, url, config) {
         const contact = await extractContactDetails(page, config);
         const doctorinfo = await extractTableData(page, config);
         const unitNumber = await extractUnitNumber(page, config);
+        const clinicName = await extractClinicName(page, config);
         
         const specialistData = {
             extractedDate: new Date().toISOString().split('T')[0],
@@ -289,6 +319,7 @@ export async function extractSpecialistData(page, url, config) {
             contact: contact,
             businessOverview: doctorinfo,
             unitNumber: unitNumber,
+            clinicName: clinicName,
             extractedAt: new Date().toISOString()
         };
         console.log(`Extracted data for: ${doctorName}`);
@@ -304,6 +335,7 @@ export async function extractSpecialistData(page, url, config) {
             specialty: '',
             contact: [],
             unitNumber: '',
+            clinicName: '',
             error: error.message,
             extractedAt: new Date().toISOString()
         };

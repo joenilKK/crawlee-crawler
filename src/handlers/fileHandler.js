@@ -26,6 +26,7 @@ export async function saveDataToFile(extractedData, config) {
             specialty: record.specialty,
             contact: record.contact,
             unitNumber: record.unitNumber,
+            clinicName: record.clinicName,
             // No cookies to include
         };
     });

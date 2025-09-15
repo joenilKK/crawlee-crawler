@@ -52,65 +52,80 @@ function convertCookiesToPlaywrightFormat(cookies) {
 // Get configuration based on environment (Apify or local)
 const { input, isApify, Actor } = await getConfiguration();
 
-// No input validation needed - using local config defaults
-
-// Import local configuration for hardcoded values
-const { LOCAL_CONFIG } = await import('./config/local-config.js');
-
-// Create configuration object using local config with input overrides
-const CONFIG = {
-    SITE: {
-        name: LOCAL_CONFIG.siteName,
-        baseUrl: LOCAL_CONFIG.baseUrl,
-        startUrl: LOCAL_CONFIG.startUrl,
-        allowedUrlPatterns: LOCAL_CONFIG.allowedUrlPatterns,
-        excludedUrlPatterns: LOCAL_CONFIG.excludedUrlPatterns || [],
-        pagination: {
-            type: LOCAL_CONFIG.paginationType,
-            queryPattern: LOCAL_CONFIG.queryPattern || 'page={page}',
-            pathPattern: LOCAL_CONFIG.pathPattern || '/page/{page}/',
-            baseUrl: LOCAL_CONFIG.paginationBaseUrl || null,
-            startPage: LOCAL_CONFIG.startPage || 1
-        }
-    },
-    SELECTORS: {
-        specialistLinks: LOCAL_CONFIG.specialistLinksSelector,
-        nextButton: LOCAL_CONFIG.nextButtonSelector,
-        nextButtonContainer: LOCAL_CONFIG.nextButtonContainerSelector,
-        doctorName: LOCAL_CONFIG.doctorNameSelector,
-        specialty: LOCAL_CONFIG.specialtySelector,
-        contactLinks: LOCAL_CONFIG.contactLinksSelector,
-        tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr',
-        unitNumber: LOCAL_CONFIG.unitNumber
-    },
-    CRAWLER: {
-        maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl,
-        headless: LOCAL_CONFIG.headless,
-        timeout: LOCAL_CONFIG.timeout,
-        userAgent: LOCAL_CONFIG.userAgent,
-        labels: {
-            DETAIL: 'DETAIL',
-            SPECIALISTS_LIST: 'SPECIALISTS_LIST'
-        }
-    },
-    OUTPUT: {
-        getFilename: () => {
-            // Use input filename if provided, otherwise use local config, otherwise use default
-            const customFilename = input.outputFilename && input.outputFilename.trim() !== '' ? 
-                input.outputFilename : 
-                (LOCAL_CONFIG.outputFilename && LOCAL_CONFIG.outputFilename.trim() !== '' ? 
-                    LOCAL_CONFIG.outputFilename : null);
-                    
-            if (customFilename) {
-                return customFilename.endsWith('.json') ? customFilename : `${customFilename}.json`;
+// Import configuration based on environment
+let CONFIG;
+if (isApify) {
+    // Use config.js for Apify environment
+    const { CONFIG: ApifyConfig } = await import('./config/config.js');
+    CONFIG = ApifyConfig;
+    
+    // Override with input values if provided
+    if (input.outputFilename && input.outputFilename.trim() !== '') {
+        CONFIG.OUTPUT.getFilename = () => {
+            const filename = input.outputFilename.trim();
+            return filename.endsWith('.json') ? filename : `${filename}.json`;
+        };
+    }
+} else {
+    // Use local configuration for local development
+    const { LOCAL_CONFIG } = await import('./config/local-config.js');
+    
+    // Create configuration object using local config with input overrides
+    CONFIG = {
+        SITE: {
+            name: LOCAL_CONFIG.siteName,
+            baseUrl: LOCAL_CONFIG.baseUrl,
+            startUrl: LOCAL_CONFIG.startUrl,
+            allowedUrlPatterns: LOCAL_CONFIG.allowedUrlPatterns,
+            excludedUrlPatterns: LOCAL_CONFIG.excludedUrlPatterns || [],
+            pagination: {
+                type: LOCAL_CONFIG.paginationType,
+                queryPattern: LOCAL_CONFIG.queryPattern || 'page={page}',
+                pathPattern: LOCAL_CONFIG.pathPattern || '/page/{page}/',
+                baseUrl: LOCAL_CONFIG.paginationBaseUrl || null,
+                startPage: LOCAL_CONFIG.startPage || 1
             }
-            
-            const today = new Date().toISOString().split('T')[0];
-            return `camden-scraped-data-${today}.json`;
-        }
-    },
-    COOKIES: LOCAL_CONFIG.cookies || [],
-};
+        },
+        SELECTORS: {
+            specialistLinks: LOCAL_CONFIG.specialistLinksSelector,
+            nextButton: LOCAL_CONFIG.nextButtonSelector,
+            nextButtonContainer: LOCAL_CONFIG.nextButtonContainerSelector,
+            doctorName: LOCAL_CONFIG.doctorNameSelector,
+            specialty: LOCAL_CONFIG.specialtySelector,
+            contactLinks: LOCAL_CONFIG.contactLinksSelector,
+            tableRows: LOCAL_CONFIG.tableRowsSelector || '.panel-body tbody tr',
+            unitNumber: LOCAL_CONFIG.unitNumber,
+            clinicName: LOCAL_CONFIG.clinicName
+        },
+        CRAWLER: {
+            maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl,
+            headless: LOCAL_CONFIG.headless,
+            timeout: LOCAL_CONFIG.timeout,
+            userAgent: LOCAL_CONFIG.userAgent,
+            labels: {
+                DETAIL: 'DETAIL',
+                SPECIALISTS_LIST: 'SPECIALISTS_LIST'
+            }
+        },
+        OUTPUT: {
+            getFilename: () => {
+                // Use input filename if provided, otherwise use local config, otherwise use default
+                const customFilename = input.outputFilename && input.outputFilename.trim() !== '' ? 
+                    input.outputFilename : 
+                    (LOCAL_CONFIG.outputFilename && LOCAL_CONFIG.outputFilename.trim() !== '' ? 
+                        LOCAL_CONFIG.outputFilename : null);
+                        
+                if (customFilename) {
+                    return customFilename.endsWith('.json') ? customFilename : `${customFilename}.json`;
+                }
+                
+                const today = new Date().toISOString().split('T')[0];
+                return `camden-scraped-data-${today}.json`;
+            }
+        },
+        COOKIES: LOCAL_CONFIG.cookies || [],
+    };
+}
 
 console.log('Starting crawler with configuration:', {
     environment: isApify ? 'Apify' : 'Local',

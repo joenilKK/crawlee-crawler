@@ -37,6 +37,7 @@ export const CONFIG = {
         // Specialist detail page selectors
         doctorName: 'h1.masthead-title',
         specialty: '.doc-personalinfo .col .grid-box a',
+        clinicName: '.clinic-contacts > h3',
         contactLinks: '.clinic-contacts a',
         tableRows: '.clinic-contacts .grid a',
         unitNumber: '.unit-no .unit',
@@ -58,7 +59,7 @@ export const CONFIG = {
     OUTPUT: {
         getFilename: () => {
             const today = new Date().toISOString().split('T')[0];
-            return `camden-scraped-data-${today}.json`;
+            return `mtalvernia-scraped-data-${today}.json`;
         }
     },
 

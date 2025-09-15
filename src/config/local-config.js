@@ -29,12 +29,13 @@ export const LOCAL_CONFIG = {
     nextButtonContainerSelector: '.list-paginationcontainer',
     doctorNameSelector: 'h1.masthead-title',
     specialtySelector: '.doc-personalinfo .col .grid-box a',
+    clinicName: '.clinic-contacts > h3',
     contactLinksSelector: '.clinic-contacts a',
     tableRowsSelector: '.clinic-contacts .grid a',
     unitNumber: '.unit-no .unit',
     
     // Crawler settings
-    maxRequestsPerCrawl: -1, // Lower for local testing, use -1 for unlimited crawling
+    maxRequestsPerCrawl: 4, // Lower for local testing, use -1 for unlimited crawling
     headless: false, // Set to false for local debugging
     timeout: 10000, // Request timeout in milliseconds
     
