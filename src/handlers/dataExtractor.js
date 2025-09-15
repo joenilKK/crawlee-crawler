@@ -324,11 +324,27 @@ export async function extractSpecialistData(page, url, config) {
             url: url,
             doctorName: doctorName,
             specialty: specialty,
-            extractedAt: new Date().toISOString()
+            extractedDate: new Date().toISOString().split('T')[0]
         };
         
         // Add contact information as separate fields
         contact.forEach((contactItem, index) => {
+            // Handle website contacts
+            if (contactItem.type.toLowerCase().includes('website') || 
+                (contactItem.link.includes('http') && !contactItem.link.startsWith('tel:') && !contactItem.link.startsWith('mailto:'))) {
+                // Add as simple website field
+                flattenedData['website'] = contactItem.link;
+                return; // Skip adding contact fields
+            }
+            
+            // Handle phone contacts
+            if (contactItem.type.toLowerCase().includes('phone') || contactItem.link.startsWith('tel:')) {
+                // Add as simple phone field
+                flattenedData['phone'] = contactItem.text;
+                return; // Skip adding contact fields
+            }
+            
+            // For other contact types, keep the original format
             const suffix = contact.length > 1 ? `_${index + 1}` : '';
             flattenedData[`contact${suffix}_type`] = contactItem.type;
             flattenedData[`contact${suffix}_text`] = contactItem.text;
@@ -342,6 +358,37 @@ export async function extractSpecialistData(page, url, config) {
             flattenedData[cleanKey] = info.value;
         });
         
+        // Extract unit number by finding "Address:" and getting the next td value
+        try {
+            const unitNumber = await page.evaluate((selector) => {
+                const tableRows = document.querySelectorAll(selector);
+                console.log(`Found ${tableRows.length} table rows with selector: ${selector}`);
+                
+                for (let row of tableRows) {
+                    const cells = row.querySelectorAll('td');
+                    console.log(`Row has ${cells.length} cells`);
+                    for (let i = 0; i < cells.length - 1; i++) {
+                        const cellText = cells[i].textContent.trim();
+                        console.log(`Cell ${i}: "${cellText}"`);
+                        if (cellText.toLowerCase().includes('address:')) {
+                            const nextCell = cells[i + 1];
+                            console.log(`Found Address cell, next cell text: "${nextCell.textContent.trim()}"`);
+                            // Check if it's just text (no links)
+                            const hasLinks = nextCell.querySelectorAll('a').length > 0;
+                            if (!hasLinks) {
+                                return nextCell.textContent.trim();
+                            }
+                        }
+                    }
+                }
+                return null;
+            }, config.SELECTORS.tableRows);
+            
+           
+        } catch (error) {
+            console.log('Could not extract unit number:', error.message);
+        }
+        
         console.log(`Extracted data for: ${doctorName}`);
         return flattenedData;
         
@@ -353,7 +400,7 @@ export async function extractSpecialistData(page, url, config) {
             doctorName: 'Extraction failed',
             specialty: '',
             error: error.message,
-            extractedAt: new Date().toISOString()
+            extractedDate: new Date().toISOString().split('T')[0]
         };
     }
 }

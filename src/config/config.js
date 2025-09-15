@@ -34,10 +34,13 @@ export const CONFIG = {
         nextButtonContainer: '.list-paginationcontainer',
         
         // Specialist detail page selectors
-        doctorName: '.doctors h2',
-        specialty: '.speciality ul li',
-        contactLinks: '.clinicdetailstable tbody tr td a',
-        tableRows: '.panel-body tbody tr' // Default fallback selector
+        specialistLinksSelector: '.searchresults tbody tr td a',
+        nextButtonSelector: '.list-paginationcontainer .list-pagenext',
+        nextButtonContainerSelector: '.list-paginationcontainer',
+        doctorNameSelector: '.doctors h2',
+        specialtySelector: '.speciality ul li',
+        linksSelector: '.clinicdetailstable tbody tr td a', //this can be multiple links
+        tableRowsSelector: '.clinicdetailstable tbody tr', // Table rows for extracting address and other details
     },
 
     // Crawler settings
