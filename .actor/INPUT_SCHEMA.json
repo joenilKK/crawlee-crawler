@@ -26,8 +26,7 @@
                 "enabled": {
                     "title": "Enable Proxy",
                     "type": "boolean",
-                    "description": "Enable proxy usage for web scraping",
-                    "default": false
+                    "description": "Enable proxy usage for web scraping"
                 },
                 "proxies": {
                     "title": "Proxy List",
@@ -64,14 +63,12 @@
                     "title": "Rotation Strategy",
                     "type": "string",
                     "description": "How to rotate between proxies",
-                    "enum": ["round_robin", "random", "least_used"],
-                    "default": "round_robin"
+                    "enum": ["round_robin", "random", "least_used"]
                 },
                 "maxFailures": {
                     "title": "Max Failures per Proxy",
                     "type": "number",
                     "description": "Maximum number of failures before marking proxy as failed",
-                    "default": 3,
                     "minimum": 1
                 }
             }
