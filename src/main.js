@@ -456,7 +456,6 @@ const mainProxyConfig = proxyManager.getPlaywrightProxyConfig(mainProxyUrl);
 const crawler = new PlaywrightCrawler({
     launchContext: {
         launchOptions: {
-            headless: CONFIG.CRAWLER.headless,
             ignoreHTTPSErrors: true,
             ...(mainProxyConfig.server && { proxy: mainProxyConfig }),
             args: [

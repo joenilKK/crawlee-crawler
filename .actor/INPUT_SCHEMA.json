@@ -27,13 +27,12 @@
                 "proxyUrls": {
                     "title": "Proxy URLs",
                     "type": "array",
-                    "description": "List of proxy URLs (e.g., http://username:password@proxy.example.com:8080)",
+                    "description": "List of proxy URLs (e.g., http://username:password@proxy.example.com:8080). Enter one proxy URL per line.",
                     "items": {
                         "type": "string",
                         "pattern": "^https?://.*"
                     },
-                    "editor": "stringList",
-                    "sectionCaption": "Enter one proxy URL per line"
+                    "editor": "stringList"
                 },
                 "proxyCountry": {
                     "title": "Proxy Country",
