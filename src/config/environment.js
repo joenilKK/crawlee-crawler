@@ -39,7 +39,8 @@ export async function getConfiguration() {
             maxRequestsPerCrawl: LOCAL_CONFIG.maxRequestsPerCrawl,
             cookies: LOCAL_CONFIG.cookies || [],
             headless: LOCAL_CONFIG.headless,
-            outputFilename: LOCAL_CONFIG.outputFilename || ''
+            outputFilename: LOCAL_CONFIG.outputFilename || '',
+            crawlerType: LOCAL_CONFIG.crawlerType || 'playwright-chrome'
         };
         
         return { input, isApify: false, Actor: null };

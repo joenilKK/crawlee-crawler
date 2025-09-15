@@ -425,6 +425,12 @@ function createCrawler(config) {
 }
 
 function createCrawlerByType(config, crawlerType) {
+    // Force Chrome if we're on Windows and Firefox is requested (to avoid path issues)
+    if (crawlerType === 'playwright-firefox' && process.platform === 'win32') {
+        console.log('🔄 Windows detected - switching from Firefox to Chrome to avoid path issues');
+        crawlerType = 'playwright-chrome';
+    }
+    
     const commonOptions = {
         maxConcurrency: 1,
         minConcurrency: 1,
