@@ -1,6 +1,7 @@
 import { PlaywrightCrawler, ProxyConfiguration } from 'crawlee';
 import { BrowserName, DeviceCategory, OperatingSystemsName } from '@crawlee/browser-pool';
 import { chromium } from 'playwright';
+import { Actor } from 'apify';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { handlePagination, handleInitialPagination, handleAjaxPagination } from './handlers/paginationHandler.js';
@@ -434,12 +435,25 @@ const CONFIG = {
         blacklistFailedProxies: LOCAL_CONFIG.proxy?.blacklistFailedProxies !== false,
         blacklistDuration: LOCAL_CONFIG.proxy?.blacklistDuration || 300000,
         // Apify-specific proxy configuration
-        apifyProxyConfig: isApify && input.proxyConfiguration ? new ProxyConfiguration(input.proxyConfiguration) : null
+        apifyProxyConfig: null // Will be created using Actor.createProxyConfiguration() if needed
     }
 };
 
 // Initialize proxy manager
 const proxyManager = new ProxyManager(CONFIG);
+
+// Create Apify proxy configuration if in Apify environment
+let apifyProxyConfig = null;
+if (isApify && input.proxyConfiguration) {
+    try {
+        // Pass the entire proxyConfiguration object directly to Actor.createProxyConfiguration()
+        apifyProxyConfig = await Actor.createProxyConfiguration(input.proxyConfiguration);
+        console.log('✅ Apify proxy configuration created successfully');
+    } catch (error) {
+        console.error('❌ Failed to create Apify proxy configuration:', error.message);
+        apifyProxyConfig = null;
+    }
+}
 
 console.log('Starting crawler with configuration:', {
     environment: isApify ? 'Apify' : 'Local',
@@ -479,7 +493,7 @@ if (isApify && CONFIG.PROXY.apifyProxyConfig) {
 
 const crawler = new PlaywrightCrawler({
     // Use Apify proxy configuration if available
-    ...(CONFIG.PROXY.apifyProxyConfig && { proxyConfiguration: CONFIG.PROXY.apifyProxyConfig }),
+    ...(apifyProxyConfig && { proxyConfiguration: apifyProxyConfig }),
     launchContext: {
         launchOptions: {
             ignoreHTTPSErrors: true,
