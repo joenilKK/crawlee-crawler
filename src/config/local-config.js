@@ -60,7 +60,29 @@ export const LOCAL_CONFIG = {
         */
     ],
     
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    
+    // Proxy configuration
+    proxy: {
+        enabled: false, // Set to true to enable proxy usage
+        urls: [
+            // Add your proxy URLs here in the format:
+            // 'http://username:password@proxy.example.com:8080',
+            // 'http://proxy2.example.com:3128',
+            // 'socks5://username:password@proxy.example.com:1080'
+        ],
+        country: 'US', // Country code for proxy selection (e.g., US, GB, DE, FR)
+        rotation: 'perRequest', // 'perRequest', 'perPage', or 'perSession'
+        retryCount: 3, // Number of times to retry with different proxy on failure
+        timeout: 30000, // Proxy connection timeout in milliseconds
+        retryDelay: 5000, // Delay between proxy retries in milliseconds
+        // Advanced proxy settings
+        bypassUrls: [], // URLs to bypass proxy (e.g., ['localhost', '127.0.0.1'])
+        maxConcurrentRequests: 1, // Max concurrent requests per proxy
+        healthCheckInterval: 60000, // Health check interval in milliseconds
+        blacklistFailedProxies: true, // Automatically blacklist failed proxies
+        blacklistDuration: 300000 // How long to keep proxies blacklisted (5 minutes)
+    }
 };
 
 // You can override any of these settings by creating a local-config-override.js file

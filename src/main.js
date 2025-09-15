@@ -5,6 +5,7 @@ import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { handlePagination, handleInitialPagination, handleAjaxPagination } from './handlers/paginationHandler.js';
 import { shouldCrawlUrl } from './utils/helpers.js';
+import { ProxyManager } from './utils/proxyManager.js';
 import { 
     getConfiguration, 
     handleDataOutput, 
@@ -28,8 +29,12 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
         try {
             console.log(`🆕 Starting fresh browser for: ${entityUrl} (attempt ${attempt}/${maxRetries})`);
             
-            // Create fresh browser instance
-            browser = await chromium.launch({
+            // Get proxy configuration for this request
+            const proxyUrl = proxyManager.getNextProxy(config.PROXY?.rotation || 'perRequest');
+            const proxyConfig = proxyManager.getPlaywrightProxyConfig(proxyUrl);
+            
+            // Create fresh browser instance with proxy if configured
+            const launchOptions = {
                 headless: config.LOCAL_CONFIG?.headless !== false,
                 args: [
                     '--no-sandbox',
@@ -53,7 +58,15 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
                     '--disable-default-apps',
                     '--disable-sync'
                 ]
-            });
+            };
+
+            // Add proxy configuration if available
+            if (proxyConfig.server) {
+                launchOptions.proxy = proxyConfig;
+                console.log(`🌐 Using proxy: ${proxyManager.maskProxyUrl(proxyUrl)}`);
+            }
+
+            browser = await chromium.launch(launchOptions);
             
             page = await browser.newPage();
             
@@ -89,11 +102,24 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
             entityData.url = entityUrl;
             
             console.log(`✅ Successfully extracted: ${entityData.entityName || 'Unknown'}`);
+            
+            // Mark proxy as successful
+            if (proxyUrl) {
+                proxyManager.markProxySuccess(proxyUrl);
+            }
+            
             return { success: true, data: entityData };
             
         } catch (error) {
             lastError = error;
             console.error(`❌ Attempt ${attempt}/${maxRetries} failed for ${entityUrl}:`, error.message);
+            
+            // Mark proxy as failed if it was a network/proxy error
+            if (proxyUrl && (error.message.includes('proxy') || error.message.includes('network') || 
+                error.message.includes('timeout') || error.message.includes('ECONNREFUSED') ||
+                error.message.includes('ENOTFOUND') || error.message.includes('ETIMEDOUT'))) {
+                proxyManager.markProxyFailed(proxyUrl, error);
+            }
             
             // If this is not the last attempt, wait before retrying
             if (attempt < maxRetries) {
@@ -379,14 +405,34 @@ const CONFIG = {
         }
     },
     COOKIES: LOCAL_CONFIG.cookies || [],
+    PROXY: {
+        // Merge input proxy configuration with local config
+        enabled: input.proxyConfiguration?.useProxy || LOCAL_CONFIG.proxy?.enabled || false,
+        urls: input.proxyConfiguration?.proxyUrls || LOCAL_CONFIG.proxy?.urls || [],
+        country: input.proxyConfiguration?.proxyCountry || LOCAL_CONFIG.proxy?.country || 'US',
+        rotation: input.proxyConfiguration?.proxyRotation || LOCAL_CONFIG.proxy?.rotation || 'perRequest',
+        retryCount: input.proxyConfiguration?.proxyRetryCount || LOCAL_CONFIG.proxy?.retryCount || 3,
+        timeout: (input.proxyConfiguration?.proxyTimeout || LOCAL_CONFIG.proxy?.timeout || 30) * 1000, // Convert to milliseconds
+        retryDelay: LOCAL_CONFIG.proxy?.retryDelay || 5000,
+        bypassUrls: LOCAL_CONFIG.proxy?.bypassUrls || [],
+        maxConcurrentRequests: LOCAL_CONFIG.proxy?.maxConcurrentRequests || 1,
+        healthCheckInterval: LOCAL_CONFIG.proxy?.healthCheckInterval || 60000,
+        blacklistFailedProxies: LOCAL_CONFIG.proxy?.blacklistFailedProxies !== false,
+        blacklistDuration: LOCAL_CONFIG.proxy?.blacklistDuration || 300000
+    }
 };
+
+// Initialize proxy manager
+const proxyManager = new ProxyManager(CONFIG);
 
 console.log('Starting crawler with configuration:', {
     environment: isApify ? 'Apify' : 'Local',
     siteName: CONFIG.SITE.name,
     startUrl: CONFIG.SITE.startUrl,
     maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl === -1 ? 'unlimited' : CONFIG.CRAWLER.maxRequestsPerCrawl,
-    headless: CONFIG.CRAWLER.headless
+    headless: CONFIG.CRAWLER.headless,
+    proxyEnabled: CONFIG.PROXY.enabled,
+    proxyCount: CONFIG.PROXY.urls.length
 });
 
 // Array to store all extracted data
@@ -403,11 +449,16 @@ if (playwrightCookies.length > 0) {
     console.log('Cookie domains:', [...new Set(playwrightCookies.map(c => c.domain))].join(', '));
 }
 
+// Get initial proxy configuration for main crawler
+const mainProxyUrl = proxyManager.getNextProxy(CONFIG.PROXY?.rotation || 'perRequest');
+const mainProxyConfig = proxyManager.getPlaywrightProxyConfig(mainProxyUrl);
+
 const crawler = new PlaywrightCrawler({
     launchContext: {
         launchOptions: {
             headless: CONFIG.CRAWLER.headless,
             ignoreHTTPSErrors: true,
+            ...(mainProxyConfig.server && { proxy: mainProxyConfig }),
             args: [
                 '--disable-web-security',
                 '--disable-features=VizDisplayCompositor',
@@ -534,7 +585,12 @@ const crawler = new PlaywrightCrawler({
                     
                     try {
                         console.log(`🆕 Creating fresh browser for page ${currentPage}: ${currentPageUrl}`);
-                        listingBrowser = await chromium.launch({
+                        
+                        // Get proxy configuration for listing page
+                        const listingProxyUrl = proxyManager.getNextProxy(CONFIG.PROXY?.rotation || 'perRequest');
+                        const listingProxyConfig = proxyManager.getPlaywrightProxyConfig(listingProxyUrl);
+                        
+                        const listingLaunchOptions = {
                             headless: LOCAL_CONFIG?.headless !== false,
                             args: [
                                 '--no-sandbox',
@@ -544,7 +600,15 @@ const crawler = new PlaywrightCrawler({
                                 '--disable-web-security', // Help prevent ad interference
                                 '--disable-features=VizDisplayCompositor' // Reduce ad rendering issues
                             ]
-                        });
+                        };
+
+                        // Add proxy configuration if available
+                        if (listingProxyConfig.server) {
+                            listingLaunchOptions.proxy = listingProxyConfig;
+                            console.log(`🌐 Using proxy for listing: ${proxyManager.maskProxyUrl(listingProxyUrl)}`);
+                        }
+
+                        listingBrowser = await chromium.launch(listingLaunchOptions);
                         
                         listingPage = await listingBrowser.newPage();
                         listingPage.setDefaultTimeout(LOCAL_CONFIG?.timeout || 30000);
@@ -627,6 +691,13 @@ const crawler = new PlaywrightCrawler({
                     pageError = error;
                     console.error(`❌ Page ${currentPage} attempt ${pageAttempt}/${maxPageRetries} failed:`, error.message);
                     
+                    // Mark listing proxy as failed if it was a network/proxy error
+                    if (listingProxyUrl && (error.message.includes('proxy') || error.message.includes('network') || 
+                        error.message.includes('timeout') || error.message.includes('ECONNREFUSED') ||
+                        error.message.includes('ENOTFOUND') || error.message.includes('ETIMEDOUT'))) {
+                        proxyManager.markProxyFailed(listingProxyUrl, error);
+                    }
+                    
                     // If this is not the last attempt, wait before retrying
                     if (pageAttempt < maxPageRetries) {
                         const retryDelay = CONFIG.CRAWLER?.retryInterval || 10000;
@@ -642,6 +713,11 @@ const crawler = new PlaywrightCrawler({
                 console.log(`⏭️ Skipping to next page...`);
                 currentPage++;
                 continue;
+            }
+            
+            // Reset proxy rotation for new page if configured
+            if (CONFIG.PROXY.rotation === 'perPage') {
+                proxyManager.resetRotation();
             }
             
             // Check for next page button and click it
@@ -762,6 +838,24 @@ await handleDataOutput(extractedData, CONFIG, Actor, isApify, CONFIG.COOKIES);
 
 console.log(`✅ Crawling completed! Found ${extractedData.length} entities.`);
 console.log(`📁 Data saved to: ${outputPath}`);
+
+// Log proxy statistics if proxy was enabled
+if (CONFIG.PROXY.enabled) {
+    console.log('\n🌐 Proxy Statistics:');
+    const proxyStats = proxyManager.getStats();
+    console.log(`📊 Total proxies: ${proxyStats.totalProxies}`);
+    console.log(`✅ Available proxies: ${proxyStats.availableProxies}`);
+    console.log(`❌ Blacklisted proxies: ${proxyStats.blacklistedProxies}`);
+    
+    if (proxyStats.proxyDetails.length > 0) {
+        console.log('\n📋 Proxy Details:');
+        proxyStats.proxyDetails.forEach((proxy, index) => {
+            console.log(`  ${index + 1}. ${proxy.url}`);
+            console.log(`     Success: ${proxy.success}, Failed: ${proxy.failed}, Rate: ${proxy.successRate}`);
+            console.log(`     Last used: ${proxy.lastUsed}, Blacklisted: ${proxy.isBlacklisted ? 'Yes' : 'No'}`);
+        });
+    }
+}
 
 // Handle exit based on environment
 await handleExit(Actor, isApify);
