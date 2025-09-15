@@ -1,4 +1,4 @@
-import { PlaywrightCrawler } from 'crawlee';
+import { PlaywrightCrawler, ProxyConfiguration } from 'crawlee';
 import { BrowserName, DeviceCategory, OperatingSystemsName } from '@crawlee/browser-pool';
 import { chromium } from 'playwright';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
@@ -434,7 +434,7 @@ const CONFIG = {
         blacklistFailedProxies: LOCAL_CONFIG.proxy?.blacklistFailedProxies !== false,
         blacklistDuration: LOCAL_CONFIG.proxy?.blacklistDuration || 300000,
         // Apify-specific proxy configuration
-        apifyProxyConfig: isApify ? input.proxyConfiguration : null
+        apifyProxyConfig: isApify && input.proxyConfiguration ? new ProxyConfiguration(input.proxyConfiguration) : null
     }
 };
 
@@ -479,7 +479,7 @@ if (isApify && CONFIG.PROXY.apifyProxyConfig) {
 
 const crawler = new PlaywrightCrawler({
     // Use Apify proxy configuration if available
-    ...(isApify && CONFIG.PROXY.apifyProxyConfig && { proxyConfiguration: CONFIG.PROXY.apifyProxyConfig }),
+    ...(CONFIG.PROXY.apifyProxyConfig && { proxyConfiguration: CONFIG.PROXY.apifyProxyConfig }),
     launchContext: {
         launchOptions: {
             ignoreHTTPSErrors: true,
