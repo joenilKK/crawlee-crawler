@@ -17,6 +17,7 @@
             "title": "🌐 Proxy Configuration",
             "type": "object",
             "description": "Configure proxy settings for the crawler",
+            "editor": "object",
             "properties": {
                 "useProxy": {
                     "title": "Enable Proxy",
