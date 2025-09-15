@@ -1,6 +1,6 @@
 {
     "title": "Web Crawler",
-    "description": "Simple web crawler with configurable output filename.",
+    "description": "Simple web crawler with configurable output filename and crawler type selection.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
@@ -12,6 +12,27 @@
             "maxLength": 100,
             "editor": "textfield",
             "prefill": "memc-specialists"
+        },
+        "crawlerType": {
+            "title": "Crawler type (optional)",
+            "type": "string",
+            "description": "Select the type of crawler to use for web scraping",
+            "editor": "select",
+            "default": "adaptive",
+            "enum": [
+                "adaptive",
+                "playwright-firefox",
+                "cheerio",
+                "jsdom",
+                "playwright-chrome"
+            ],
+            "enumTitles": [
+                "Adaptive switching between browser and raw HTTP - Fast and renders JavaScript content if present. This is the recommended option.",
+                "Headless browser (Firefox+Playwright) - Reliable, renders JavaScript content, best in avoiding blocking, but might be slow.",
+                "Raw HTTP client (Cheerio) - Fastest, but doesn't render JavaScript content.",
+                "Raw HTTP client with JavaScript (JSDOM) - Experimental, use at your own risk.",
+                "[DEPRECATED] Headless browser (Chrome+Playwright) - The crawler will use Firefox+Playwright instead."
+            ]
         }
     },
     "required": [

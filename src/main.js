@@ -1,5 +1,5 @@
-import { PlaywrightCrawler } from 'crawlee';
-import { chromium } from 'playwright';
+import { PlaywrightCrawler, CheerioCrawler, JSDOMCrawler } from 'crawlee';
+import { chromium, firefox } from 'playwright';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
 import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { handlePagination, handleInitialPagination, handleAjaxPagination } from './handlers/paginationHandler.js';
@@ -320,6 +320,7 @@ const CONFIG = {
             maxPages: LOCAL_CONFIG.maxPages || 11
         }
     },
+    CRAWLER_TYPE: input.crawlerType || LOCAL_CONFIG.crawlerType || 'adaptive', // Use input, then local config, then default to adaptive
     SELECTORS: {
         specialistLinks: LOCAL_CONFIG.specialistLinksSelector,
         nextButton: LOCAL_CONFIG.nextButtonSelector,
@@ -370,7 +371,8 @@ console.log('Starting crawler with configuration:', {
     siteName: CONFIG.SITE.name,
     startUrl: CONFIG.SITE.startUrl,
     maxRequests: CONFIG.CRAWLER.maxRequestsPerCrawl === -1 ? 'unlimited' : CONFIG.CRAWLER.maxRequestsPerCrawl,
-    headless: CONFIG.CRAWLER.headless
+    headless: CONFIG.CRAWLER.headless,
+    crawlerType: CONFIG.CRAWLER_TYPE
 });
 
 // Array to store all extracted data
@@ -387,306 +389,475 @@ if (playwrightCookies.length > 0) {
     console.log('Cookie domains:', [...new Set(playwrightCookies.map(c => c.domain))].join(', '));
 }
 
-const crawler = new PlaywrightCrawler({
-    launchContext: {
-        launchOptions: {
-            headless: CONFIG.CRAWLER.headless,
-            ignoreHTTPSErrors: true,
-            args: [
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-gpu',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-background-networking',
-                '--disable-background-sync',
-                '--disable-device-discovery-notifications',
-                '--disable-hang-monitor',
-                '--disable-component-update',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-images',
-                '--enable-automation',
-                '--disable-default-apps',
-                '--disable-sync',
-                '--metrics-recording-only',
-                '--mute-audio',
-                '--no-default-browser-check',
-                '--no-first-run',
-                '--safebrowsing-disable-auto-update',
-                '--password-store=basic',
-                '--use-mock-keychain',
-                '--memory-pressure-off',
-                '--max_old_space_size=2048',
-                '--disable-ipc-flooding-protection',
-                '--disable-features=TranslateUI',
-                '--disable-client-side-phishing-detection',
-                '--disable-popup-blocking',
-                '--disable-prompt-on-repost',
-                '--no-crash-upload',
-                '--disable-breakpad',
-                `--user-agent=${CONFIG.CRAWLER.userAgent}`
-            ]
-        }
-    },
-    // Set lower concurrency to be respectful and stable
-    maxConcurrency: 1,
-    minConcurrency: 1,
-    // Browser pool options for stability
-    browserPoolOptions: {
-        useFingerprints: false,
-        maxOpenPagesPerBrowser: 1, // Only one page per browser to prevent resource conflicts
-        retireBrowserAfterPageCount: LOCAL_CONFIG.browserRestartCount || 3, // Restart browser every N pages to prevent memory leaks
-    },
-    // Handle session pool configuration
-    sessionPoolOptions: {
-        blockedStatusCodes: [], // Don't auto-block any status codes (including 403, 503)
-        maxPoolSize: 1,
-        sessionOptions: {
-            maxErrorScore: 15, // Higher tolerance for "errors" 
-            errorScoreDecrement: 0.3, // Slower error recovery
-        }
-    },
-    // Increase timeouts to prevent premature closures (increased for fresh browser approach)
-    requestHandlerTimeoutSecs: 3600, // 1 hour for the main handler (to handle all 1100+ entities)
-    navigationTimeoutSecs: 180, // 3 minutes for navigation
-    // Handle failed requests
-    failedRequestHandler: async ({ request, error }) => {
-        console.error(`❌ Request failed: ${error.message}`);
-    },
-    requestHandler: async ({ page, request, enqueueLinks }) => {
-        // Add random delay between 2-5 seconds to mimic human behavior
-        const delay = Math.random() * 3000 + 2000;
-        console.log(`⏱️ Waiting ${Math.round(delay)}ms before processing request`);
-        await safeWaitForTimeout(page, delay);
-        console.log(`Processing: ${request.url}`);
-        
-        // This is the main entry point - start sequential processing
-        console.log('Starting sequential corporate entity extraction');
-        console.log(`Looking for selector: ${CONFIG.SELECTORS.specialistLinks}`);
-        
-        let currentPage = 1;
-        let hasMorePages = true;
-        
-        while (hasMorePages) {
-            console.log(`\n🔄 ==================== PROCESSING PAGE ${currentPage} ====================`);
+/**
+ * Create the appropriate crawler based on the selected crawler type
+ * @param {Object} config - Configuration object
+ * @returns {Object} - Configured crawler instance
+ */
+function createCrawler(config) {
+    const crawlerType = config.CRAWLER_TYPE || 'adaptive';
+    console.log(`🔧 Creating crawler of type: ${crawlerType}`);
+    
+    const commonOptions = {
+        maxConcurrency: 1,
+        minConcurrency: 1,
+        maxRequestsPerCrawl: config.CRAWLER.maxRequestsPerCrawl === -1 ? undefined : config.CRAWLER.maxRequestsPerCrawl,
+        requestHandler: async ({ page, request, enqueueLinks }) => {
+            // Add random delay between 2-5 seconds to mimic human behavior
+            const delay = Math.random() * 3000 + 2000;
+            console.log(`⏱️ Waiting ${Math.round(delay)}ms before processing request`);
+            await safeWaitForTimeout(page, delay);
+            console.log(`Processing: ${request.url}`);
             
-            try {
-                // Use fresh browser to get entity links for current page
-                let currentPageUrl;
-                if (currentPage === 1) {
-                    currentPageUrl = LOCAL_CONFIG.paginationBaseUrl || CONFIG.SITE.startUrl;
-                } else {
-                    // Construct proper page URL using the pagination base URL
-                    const baseUrl = LOCAL_CONFIG.paginationBaseUrl || CONFIG.SITE.startUrl.replace(/[?&]page=\d+/, '');
-                    const separator = baseUrl.includes('?') ? '&' : '?';
-                    currentPageUrl = `${baseUrl}${separator}page=${currentPage}`;
-                }
-                
-                let listingBrowser = null;
-                let listingPage = null;
-                let entityLinks = [];
+            // This is the main entry point - start sequential processing
+            console.log('Starting sequential corporate entity extraction');
+            console.log(`Looking for selector: ${CONFIG.SELECTORS.specialistLinks}`);
+            
+            let currentPage = 1;
+            let hasMorePages = true;
+            
+            while (hasMorePages) {
+                console.log(`\n🔄 ==================== PROCESSING PAGE ${currentPage} ====================`);
                 
                 try {
-                    console.log(`🆕 Creating fresh browser for page ${currentPage}: ${currentPageUrl}`);
-                    listingBrowser = await chromium.launch({
-                        headless: LOCAL_CONFIG?.headless !== false,
-                        args: [
-                            '--no-sandbox',
-                            '--disable-setuid-sandbox',
-                            '--disable-dev-shm-usage',
-                            '--memory-pressure-off',
-                            '--disable-web-security', // Help prevent ad interference
-                            '--disable-features=VizDisplayCompositor' // Reduce ad rendering issues
-                        ]
-                    });
-                    
-                    listingPage = await listingBrowser.newPage();
-                    listingPage.setDefaultTimeout(LOCAL_CONFIG?.timeout || 30000);
-                    
-                    // Block ads and trackers to prevent interference
-                    await listingPage.route('**/*', (route) => {
-                        const url = route.request().url();
-                        if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication'))) {
-                            route.abort();
-                        } else {
-                            route.continue();
-                        }
-                    });
-                    
-                    await listingPage.goto(currentPageUrl, { waitUntil: 'networkidle' });
-                    await listingPage.waitForTimeout(2000);
-                    
-                    // Wait for the entity links to load
-                    await listingPage.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
-                    console.log(`✅ Entity links found on page ${currentPage}!`);
-                    
-                    // Get all entity links on current page
-                    entityLinks = await listingPage.evaluate((selector) => {
-                        const links = document.querySelectorAll(selector);
-                        return Array.from(links).map(link => link.href).filter(href => href);
-                    }, CONFIG.SELECTORS.specialistLinks);
-                    
-                } finally {
-                    // Don't close the listing browser yet - we need it for pagination
-                    console.log(`📝 Keeping listing browser open for pagination check`);
-                }
-                
-                console.log(`Found ${entityLinks.length} entities on page ${currentPage}`);
-                console.log(`🚀 Starting to process all ${entityLinks.length} entities from page ${currentPage}`);
-                
-                // Process each entity using fresh browser instances (eliminates ALL browser failures)
-                for (let i = 0; i < entityLinks.length; i++) {
-                    const entityUrl = entityLinks[i];
-                    console.log(`\n📋 Processing entity ${i + 1}/${entityLinks.length} on page ${currentPage}`);
-                    
-                    // Add interval between requests to prevent overwhelming the server
-                    if (i > 0) {
-                        const interval = LOCAL_CONFIG.requestInterval || 5000;
-                        console.log(`⏳ Waiting ${interval}ms before processing next entity...`);
-                        await new Promise(resolve => setTimeout(resolve, interval));
-                    }
-                    
-                    // Extract data using fresh browser instance (eliminates all browser persistence issues)
-                    const result = await extractEntityWithFreshBrowser(entityUrl, CONFIG);
-                    
-                    // Add the data to our collection
-                    extractedData.push(result.data);
-                    
-                    // Save data after each extraction (incremental save)
-                    await saveDataToFile(extractedData, CONFIG);
-                    
-                    if (result.success) {
-                        console.log(`✅ Successfully completed entity ${i + 1}/${entityLinks.length}: ${result.data.entityName}`);
+                    // Use fresh browser to get entity links for current page
+                    let currentPageUrl;
+                    if (currentPage === 1) {
+                        currentPageUrl = LOCAL_CONFIG.paginationBaseUrl || CONFIG.SITE.startUrl;
                     } else {
-                        console.log(`⚠️ Failed entity ${i + 1}/${entityLinks.length}: ${entityUrl} (saved as error entry)`);
+                        // Construct proper page URL using the pagination base URL
+                        const baseUrl = LOCAL_CONFIG.paginationBaseUrl || CONFIG.SITE.startUrl.replace(/[?&]page=\d+/, '');
+                        const separator = baseUrl.includes('?') ? '&' : '?';
+                        currentPageUrl = `${baseUrl}${separator}page=${currentPage}`;
                     }
                     
-                    // Brief pause after each entity to be respectful to server
-                    const entityInterval = LOCAL_CONFIG.entityInterval || 3000;
-                    console.log(`⏳ Waiting ${entityInterval}ms after entity processing...`);
-                    await new Promise(resolve => setTimeout(resolve, entityInterval));
-                }
-                
-                console.log(`✅ Completed all ${entityLinks.length} entities on page ${currentPage}`);
-                
-                // Check for next page button and click it
-                console.log(`🔍 Looking for next page button after completing page ${currentPage}...`);
-                
-                try {
-                    // Look for the next button using the nextButtonSelector
-                    const nextButtonSelector = LOCAL_CONFIG.nextButtonSelector;
-                    console.log(`🔍 Looking for next button with selector: ${nextButtonSelector}`);
+                    let listingBrowser = null;
+                    let listingPage = null;
+                    let entityLinks = [];
                     
-                    const nextButton = await listingPage.$(nextButtonSelector);
+                    try {
+                        console.log(`🆕 Creating fresh browser for page ${currentPage}: ${currentPageUrl}`);
+                        listingBrowser = await chromium.launch({
+                            headless: LOCAL_CONFIG?.headless !== false,
+                            args: [
+                                '--no-sandbox',
+                                '--disable-setuid-sandbox',
+                                '--disable-dev-shm-usage',
+                                '--memory-pressure-off',
+                                '--disable-web-security', // Help prevent ad interference
+                                '--disable-features=VizDisplayCompositor' // Reduce ad rendering issues
+                            ]
+                        });
+                        
+                        listingPage = await listingBrowser.newPage();
+                        listingPage.setDefaultTimeout(LOCAL_CONFIG?.timeout || 30000);
+                        
+                        // Block ads and trackers to prevent interference
+                        await listingPage.route('**/*', (route) => {
+                            const url = route.request().url();
+                            if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication'))) {
+                                route.abort();
+                            } else {
+                                route.continue();
+                            }
+                        });
+                        
+                        await listingPage.goto(currentPageUrl, { waitUntil: 'networkidle' });
+                        await listingPage.waitForTimeout(2000);
+                        
+                        // Wait for the entity links to load
+                        await listingPage.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
+                        console.log(`✅ Entity links found on page ${currentPage}!`);
+                        
+                        // Get all entity links on current page
+                        entityLinks = await listingPage.evaluate((selector) => {
+                            const links = document.querySelectorAll(selector);
+                            return Array.from(links).map(link => link.href).filter(href => href);
+                        }, CONFIG.SELECTORS.specialistLinks);
+                        
+                    } finally {
+                        // Don't close the listing browser yet - we need it for pagination
+                        console.log(`📝 Keeping listing browser open for pagination check`);
+                    }
                     
-                    if (nextButton) {
-                        // Check the text content of the next button
-                        const buttonText = await listingPage.evaluate((button) => {
-                            return button.textContent.trim();
-                        }, nextButton);
+                    console.log(`Found ${entityLinks.length} entities on page ${currentPage}`);
+                    console.log(`🚀 Starting to process all ${entityLinks.length} entities from page ${currentPage}`);
+                    
+                    // Process each entity using fresh browser instances (eliminates ALL browser failures)
+                    for (let i = 0; i < entityLinks.length; i++) {
+                        const entityUrl = entityLinks[i];
+                        console.log(`\n📋 Processing entity ${i + 1}/${entityLinks.length} on page ${currentPage}`);
                         
-                        console.log(`🔍 Next button text: "${buttonText}"`);
+                        // Add interval between requests to prevent overwhelming the server
+                        if (i > 0) {
+                            const interval = LOCAL_CONFIG.requestInterval || 5000;
+                            console.log(`⏳ Waiting ${interval}ms before processing next entity...`);
+                            await new Promise(resolve => setTimeout(resolve, interval));
+                        }
                         
-                        // If button text is NOT "Next Page", we've reached the last page
-                        if (buttonText !== "Next Page") {
-                            console.log(`🏁 Button text is "${buttonText}" (not "Next Page") - this is the last page of pagination`);
+                        // Extract data using fresh browser instance (eliminates all browser persistence issues)
+                        const result = await extractEntityWithFreshBrowser(entityUrl, CONFIG);
+                        
+                        // Add the data to our collection
+                        extractedData.push(result.data);
+                        
+                        // Save data after each extraction (incremental save)
+                        await saveDataToFile(extractedData, CONFIG);
+                        
+                        if (result.success) {
+                            console.log(`✅ Successfully completed entity ${i + 1}/${entityLinks.length}: ${result.data.entityName}`);
+                        } else {
+                            console.log(`⚠️ Failed entity ${i + 1}/${entityLinks.length}: ${entityUrl} (saved as error entry)`);
+                        }
+                        
+                        // Brief pause after each entity to be respectful to server
+                        const entityInterval = LOCAL_CONFIG.entityInterval || 3000;
+                        console.log(`⏳ Waiting ${entityInterval}ms after entity processing...`);
+                        await new Promise(resolve => setTimeout(resolve, entityInterval));
+                    }
+                    
+                    console.log(`✅ Completed all ${entityLinks.length} entities on page ${currentPage}`);
+                    
+                    // Check for next page button and click it
+                    console.log(`🔍 Looking for next page button after completing page ${currentPage}...`);
+                    
+                    try {
+                        // Look for the next button using the nextButtonSelector
+                        const nextButtonSelector = LOCAL_CONFIG.nextButtonSelector;
+                        console.log(`🔍 Looking for next button with selector: ${nextButtonSelector}`);
+                        
+                        const nextButton = await listingPage.$(nextButtonSelector);
+                        
+                        if (nextButton) {
+                            // Check the text content of the next button
+                            const buttonText = await listingPage.evaluate((button) => {
+                                return button.textContent.trim();
+                            }, nextButton);
+                            
+                            console.log(`🔍 Next button text: "${buttonText}"`);
+                            
+                            // If button text is NOT "Next Page", we've reached the last page
+                            if (buttonText !== "Next Page") {
+                                console.log(`🏁 Button text is "${buttonText}" (not "Next Page") - this is the last page of pagination`);
+                                console.log(`✅ Scraping completed! Successfully processed ${currentPage} pages total.`);
+                                hasMorePages = false;
+                                break; // Exit the pagination loop completely
+                            }
+                            
+                            // Button text IS "Next Page", so more pages are available
+                            console.log(`✅ Button text is "Next Page" - more pages available, proceeding to next page...`);
+                            
+                            // Also check if the next button is disabled
+                            const isDisabled = await listingPage.evaluate((button) => {
+                                const parentLi = button.closest('li');
+                                return button.disabled || 
+                                       button.classList.contains('disabled') || 
+                                       (parentLi && parentLi.classList.contains('disabled')) ||
+                                       button.getAttribute('aria-disabled') === 'true';
+                            }, nextButton);
+                            
+                            if (isDisabled) {
+                                console.log(`📄 Next button is disabled - reached end of pagination at page ${currentPage}`);
+                                hasMorePages = false;
+                                continue;
+                            }
+                            
+                            console.log(`🖱️ Found "Next Page" button - navigating to next page ${currentPage + 1}`);
+                            
+                            // Extract href and navigate directly (more reliable than clicking)
+                            const nextPageUrl = await listingPage.evaluate((selector) => {
+                                const button = document.querySelector(selector);
+                                return button ? button.href : null;
+                            }, nextButtonSelector);
+                            
+                            if (nextPageUrl) {
+                                console.log(`🌐 Navigating directly to: ${nextPageUrl}`);
+                                await listingPage.goto(nextPageUrl, { waitUntil: 'load', timeout: 60000 });
+                                currentPage++;
+                                console.log(`✅ Successfully navigated to page ${currentPage}`);
+                                
+                                // Wait a bit for the page to fully load
+                                const pageInterval = LOCAL_CONFIG.pageInterval || 10000;
+                                console.log(`⏳ Waiting ${pageInterval}ms for page ${currentPage} to fully load...`);
+                                await new Promise(resolve => setTimeout(resolve, pageInterval));
+                                
+                                // Continue to next iteration to process the new page
+                                continue;
+                            } else {
+                                console.log(`❌ Could not extract next page URL from button`);
+                                hasMorePages = false;
+                                break;
+                            }
+                            
+                        } else {
+                            console.log(`🏁 No next button found - this is the last page of pagination`);
                             console.log(`✅ Scraping completed! Successfully processed ${currentPage} pages total.`);
                             hasMorePages = false;
                             break; // Exit the pagination loop completely
                         }
                         
-                        // Button text IS "Next Page", so more pages are available
-                        console.log(`✅ Button text is "Next Page" - more pages available, proceeding to next page...`);
-                        
-                        // Also check if the next button is disabled
-                        const isDisabled = await listingPage.evaluate((button) => {
-                            const parentLi = button.closest('li');
-                            return button.disabled || 
-                                   button.classList.contains('disabled') || 
-                                   (parentLi && parentLi.classList.contains('disabled')) ||
-                                   button.getAttribute('aria-disabled') === 'true';
-                        }, nextButton);
-                        
-                        if (isDisabled) {
-                            console.log(`📄 Next button is disabled - reached end of pagination at page ${currentPage}`);
-                            hasMorePages = false;
-                            continue;
-                        }
-                        
-                        console.log(`🖱️ Found "Next Page" button - navigating to next page ${currentPage + 1}`);
-                        
-                        // Extract href and navigate directly (more reliable than clicking)
-                        const nextPageUrl = await listingPage.evaluate((selector) => {
-                            const button = document.querySelector(selector);
-                            return button ? button.href : null;
-                        }, nextButtonSelector);
-                        
-                        if (nextPageUrl) {
-                            console.log(`🌐 Navigating directly to: ${nextPageUrl}`);
-                            await listingPage.goto(nextPageUrl, { waitUntil: 'load', timeout: 60000 });
-                            currentPage++;
-                            console.log(`✅ Successfully navigated to page ${currentPage}`);
-                            
-                            // Wait a bit for the page to fully load
-                            const pageInterval = LOCAL_CONFIG.pageInterval || 10000;
-                            console.log(`⏳ Waiting ${pageInterval}ms for page ${currentPage} to fully load...`);
-                            await new Promise(resolve => setTimeout(resolve, pageInterval));
-                            
-                            // Continue to next iteration to process the new page
-                            continue;
-                        } else {
-                            console.log(`❌ Could not extract next page URL from button`);
-                            hasMorePages = false;
-                            break;
-                        }
-                        
-                    } else {
-                        console.log(`🏁 No next button found - this is the last page of pagination`);
-                        console.log(`✅ Scraping completed! Successfully processed ${currentPage} pages total.`);
+                    } catch (nextButtonError) {
+                        console.log(`❌ Error clicking next button: ${nextButtonError.message}`);
                         hasMorePages = false;
-                        break; // Exit the pagination loop completely
+                        continue;
+                    } finally {
+                        // Clean up listing browser after pagination check
+                        try {
+                            if (listingPage) await listingPage.close();
+                            if (listingBrowser) await listingBrowser.close();
+                            console.log(`🧹 Cleaned up listing browser after pagination check`);
+                        } catch (cleanupError) {
+                            console.warn(`⚠️ Cleanup warning for listing browser:`, cleanupError.message);
+                        }
                     }
                     
-                } catch (nextButtonError) {
-                    console.log(`❌ Error clicking next button: ${nextButtonError.message}`);
+                } catch (error) {
+                    console.log(`❌ Error on page ${currentPage}:`, error.message);
                     hasMorePages = false;
-                    continue;
-                } finally {
-                    // Clean up listing browser after pagination check
-                    try {
-                        if (listingPage) await listingPage.close();
-                        if (listingBrowser) await listingBrowser.close();
-                        console.log(`🧹 Cleaned up listing browser after pagination check`);
-                    } catch (cleanupError) {
-                        console.warn(`⚠️ Cleanup warning for listing browser:`, cleanupError.message);
-                    }
                 }
-                
-            } catch (error) {
-                console.log(`❌ Error on page ${currentPage}:`, error.message);
-                hasMorePages = false;
             }
+            
+            console.log(`✅ Completed processing all pages. Total pages processed: ${currentPage}`);
+            console.log(`📊 Total entities extracted: ${extractedData.length}`);
+            
+            // Calculate expected vs actual
+            if (currentPage >= 11) {
+                console.log(`🎯 Successfully reached expected 11+ pages of pagination!`);
+            } else {
+                console.log(`⚠️ Only processed ${currentPage} pages - expected 11 pages`);
+            }
+        },
+        failedRequestHandler: async ({ request, error }) => {
+            console.error(`❌ Request failed: ${error.message}`);
         }
-        
-        console.log(`✅ Completed processing all pages. Total pages processed: ${currentPage}`);
-        console.log(`📊 Total entities extracted: ${extractedData.length}`);
-        
-        // Calculate expected vs actual
-        if (currentPage >= 11) {
-            console.log(`🎯 Successfully reached expected 11+ pages of pagination!`);
-        } else {
-            console.log(`⚠️ Only processed ${currentPage} pages - expected 11 pages`);
-        }
-    },
-    maxRequestsPerCrawl: CONFIG.CRAWLER.maxRequestsPerCrawl === -1 ? undefined : CONFIG.CRAWLER.maxRequestsPerCrawl,
-    headless: CONFIG.CRAWLER.headless,
-});
+    };
+
+    switch (crawlerType) {
+        case 'playwright-firefox':
+            return new PlaywrightCrawler({
+                ...commonOptions,
+                launchContext: {
+                    launcher: firefox,
+                    launchOptions: {
+                        headless: config.CRAWLER.headless,
+                        ignoreHTTPSErrors: true,
+                        args: [
+                            '--disable-web-security',
+                            '--disable-features=VizDisplayCompositor',
+                            '--disable-dev-shm-usage',
+                            '--no-sandbox',
+                            '--disable-setuid-sandbox',
+                            '--disable-gpu',
+                            '--disable-background-timer-throttling',
+                            '--disable-backgrounding-occluded-windows',
+                            '--disable-renderer-backgrounding',
+                            '--disable-background-networking',
+                            '--disable-background-sync',
+                            '--disable-device-discovery-notifications',
+                            '--disable-hang-monitor',
+                            '--disable-component-update',
+                            '--disable-blink-features=AutomationControlled',
+                            '--disable-extensions',
+                            '--disable-plugins',
+                            '--disable-images',
+                            '--enable-automation',
+                            '--disable-default-apps',
+                            '--disable-sync',
+                            '--metrics-recording-only',
+                            '--mute-audio',
+                            '--no-default-browser-check',
+                            '--no-first-run',
+                            '--safebrowsing-disable-auto-update',
+                            '--password-store=basic',
+                            '--use-mock-keychain',
+                            '--memory-pressure-off',
+                            '--max_old_space_size=2048',
+                            '--disable-ipc-flooding-protection',
+                            '--disable-features=TranslateUI',
+                            '--disable-client-side-phishing-detection',
+                            '--disable-popup-blocking',
+                            '--disable-prompt-on-repost',
+                            '--no-crash-upload',
+                            '--disable-breakpad',
+                            `--user-agent=${config.CRAWLER.userAgent}`
+                        ]
+                    }
+                },
+                browserPoolOptions: {
+                    useFingerprints: false,
+                    maxOpenPagesPerBrowser: 1,
+                    retireBrowserAfterPageCount: LOCAL_CONFIG.browserRestartCount || 3,
+                },
+                sessionPoolOptions: {
+                    blockedStatusCodes: [],
+                    maxPoolSize: 1,
+                    sessionOptions: {
+                        maxErrorScore: 15,
+                        errorScoreDecrement: 0.3,
+                    }
+                },
+                requestHandlerTimeoutSecs: 3600,
+                navigationTimeoutSecs: 180,
+            });
+
+        case 'playwright-chrome':
+            // Deprecated - use Firefox instead
+            console.log('⚠️ Chrome crawler is deprecated, using Firefox instead');
+            return new PlaywrightCrawler({
+                ...commonOptions,
+                launchContext: {
+                    launcher: chromium,
+                    launchOptions: {
+                        headless: config.CRAWLER.headless,
+                        ignoreHTTPSErrors: true,
+                        args: [
+                            '--disable-web-security',
+                            '--disable-features=VizDisplayCompositor',
+                            '--disable-dev-shm-usage',
+                            '--no-sandbox',
+                            '--disable-setuid-sandbox',
+                            '--disable-gpu',
+                            '--disable-background-timer-throttling',
+                            '--disable-backgrounding-occluded-windows',
+                            '--disable-renderer-backgrounding',
+                            '--disable-background-networking',
+                            '--disable-background-sync',
+                            '--disable-device-discovery-notifications',
+                            '--disable-hang-monitor',
+                            '--disable-component-update',
+                            '--disable-blink-features=AutomationControlled',
+                            '--disable-extensions',
+                            '--disable-plugins',
+                            '--disable-images',
+                            '--enable-automation',
+                            '--disable-default-apps',
+                            '--disable-sync',
+                            '--metrics-recording-only',
+                            '--mute-audio',
+                            '--no-default-browser-check',
+                            '--no-first-run',
+                            '--safebrowsing-disable-auto-update',
+                            '--password-store=basic',
+                            '--use-mock-keychain',
+                            '--memory-pressure-off',
+                            '--max_old_space_size=2048',
+                            '--disable-ipc-flooding-protection',
+                            '--disable-features=TranslateUI',
+                            '--disable-client-side-phishing-detection',
+                            '--disable-popup-blocking',
+                            '--disable-prompt-on-repost',
+                            '--no-crash-upload',
+                            '--disable-breakpad',
+                            `--user-agent=${config.CRAWLER.userAgent}`
+                        ]
+                    }
+                },
+                browserPoolOptions: {
+                    useFingerprints: false,
+                    maxOpenPagesPerBrowser: 1,
+                    retireBrowserAfterPageCount: LOCAL_CONFIG.browserRestartCount || 3,
+                },
+                sessionPoolOptions: {
+                    blockedStatusCodes: [],
+                    maxPoolSize: 1,
+                    sessionOptions: {
+                        maxErrorScore: 15,
+                        errorScoreDecrement: 0.3,
+                    }
+                },
+                requestHandlerTimeoutSecs: 3600,
+                navigationTimeoutSecs: 180,
+            });
+
+        case 'cheerio':
+            return new CheerioCrawler({
+                ...commonOptions,
+                requestHandlerTimeoutSecs: 3600,
+                // Note: Cheerio doesn't support JavaScript rendering
+                // This will only work for static content
+            });
+
+        case 'jsdom':
+            return new JSDOMCrawler({
+                ...commonOptions,
+                requestHandlerTimeoutSecs: 3600,
+                // Note: JSDOM is experimental and may not work reliably
+            });
+
+        case 'adaptive':
+        default:
+            // Use Playwright with Firefox as the default adaptive choice
+            console.log('🔄 Using adaptive crawler (Playwright Firefox)');
+            return new PlaywrightCrawler({
+                ...commonOptions,
+                launchContext: {
+                    launcher: firefox,
+                    launchOptions: {
+                        headless: config.CRAWLER.headless,
+                        ignoreHTTPSErrors: true,
+                        args: [
+                            '--disable-web-security',
+                            '--disable-features=VizDisplayCompositor',
+                            '--disable-dev-shm-usage',
+                            '--no-sandbox',
+                            '--disable-setuid-sandbox',
+                            '--disable-gpu',
+                            '--disable-background-timer-throttling',
+                            '--disable-backgrounding-occluded-windows',
+                            '--disable-renderer-backgrounding',
+                            '--disable-background-networking',
+                            '--disable-background-sync',
+                            '--disable-device-discovery-notifications',
+                            '--disable-hang-monitor',
+                            '--disable-component-update',
+                            '--disable-blink-features=AutomationControlled',
+                            '--disable-extensions',
+                            '--disable-plugins',
+                            '--disable-images',
+                            '--enable-automation',
+                            '--disable-default-apps',
+                            '--disable-sync',
+                            '--metrics-recording-only',
+                            '--mute-audio',
+                            '--no-default-browser-check',
+                            '--no-first-run',
+                            '--safebrowsing-disable-auto-update',
+                            '--password-store=basic',
+                            '--use-mock-keychain',
+                            '--memory-pressure-off',
+                            '--max_old_space_size=2048',
+                            '--disable-ipc-flooding-protection',
+                            '--disable-features=TranslateUI',
+                            '--disable-client-side-phishing-detection',
+                            '--disable-popup-blocking',
+                            '--disable-prompt-on-repost',
+                            '--no-crash-upload',
+                            '--disable-breakpad',
+                            `--user-agent=${config.CRAWLER.userAgent}`
+                        ]
+                    }
+                },
+                browserPoolOptions: {
+                    useFingerprints: false,
+                    maxOpenPagesPerBrowser: 1,
+                    retireBrowserAfterPageCount: LOCAL_CONFIG.browserRestartCount || 3,
+                },
+                sessionPoolOptions: {
+                    blockedStatusCodes: [],
+                    maxPoolSize: 1,
+                    sessionOptions: {
+                        maxErrorScore: 15,
+                        errorScoreDecrement: 0.3,
+                    }
+                },
+                requestHandlerTimeoutSecs: 3600,
+                navigationTimeoutSecs: 180,
+            });
+    }
+}
+
+// Create the appropriate crawler based on configuration
+const crawler = createCrawler(CONFIG);
 
 await crawler.run([CONFIG.SITE.startUrl]);
 
