@@ -242,6 +242,10 @@ export const DEFAULT_PROXIES = [
     // Example:
     // { host: 'proxy1.example.com', port: 8080, username: 'user', password: 'pass' },
     // { host: 'proxy2.example.com', port: 3128 },
+    
+    // Test proxies (these are examples - replace with real working proxies)
+    { host: '8.8.8.8', port: 8080 }, // Google DNS as proxy test
+    { host: '1.1.1.1', port: 8080 }, // Cloudflare DNS as proxy test
 ];
 
 /**
@@ -250,15 +254,24 @@ export const DEFAULT_PROXIES = [
  * @returns {ProxyManager} Configured proxy manager
  */
 export function createProxyManager(config = {}) {
+    console.log('🔧 ProxyManager Debug:');
+    console.log('   Config received:', JSON.stringify(config, null, 2));
+    console.log('   Proxies array length:', config.proxies?.length || 0);
+    
     const manager = new ProxyManager(config);
     
     // Add proxies from config if provided
-    if (config.proxies && Array.isArray(config.proxies)) {
+    if (config.proxies && Array.isArray(config.proxies) && config.proxies.length > 0) {
+        console.log('   Adding proxies from config:', config.proxies.length);
         manager.addProxies(config.proxies);
     } else {
+        console.log('   No proxies in config, using default proxies:', DEFAULT_PROXIES.length);
         // Fallback to default proxies if no config provided
         manager.addProxies(DEFAULT_PROXIES);
     }
+    
+    console.log('   Final proxy count:', manager.proxies.length);
+    console.log('   Proxy manager enabled:', manager.config.enabled);
     
     return manager;
 }

@@ -40,6 +40,27 @@ export const LOCAL_CONFIG = {
     delayAfterPageLoad: 200, // Delay after page loads to ensure stability (further reduced from 500ms)
     ajaxPaginationDelay: 500, // Extra delay for AJAX pagination (further reduced from 1000ms)
     
+    // Concurrency and performance settings
+    minConcurrency: 1, // Minimum concurrent requests
+    maxConcurrency: 2, // Maximum concurrent requests (increased for better performance)
+    maxRequestsPerMinute: 60, // Rate limiting to avoid overwhelming the target site
+    
+    // Autoscaled pool configuration
+    scaleUpStepRatio: 0.1, // Increase concurrency by 10% when scaling up
+    scaleDownStepRatio: 0.1, // Decrease concurrency by 10% when scaling down
+    autoscaleIntervalSecs: 10, // Check scaling every 10 seconds
+    desiredConcurrencyRatio: 0.9, // Target 90% of max concurrency
+    
+    // System resource monitoring
+    maxEventLoopDelay: 50, // Maximum event loop delay in milliseconds
+    maxMemoryRatio: 0.7, // Maximum memory usage ratio (70%)
+    maxCpuRatio: 0.7, // Maximum CPU usage ratio (70%)
+    maxClientErrors: 10, // Maximum client errors before scaling down
+    
+    // Browser viewport settings
+    viewportWidth: 1920, // Browser window width
+    viewportHeight: 1080, // Browser window height
+    
     
     // Output settings
     outputFilename: 'mtalvernia-scraped-data', // Custom filename (will add .json automatically)
@@ -59,8 +80,12 @@ export const LOCAL_CONFIG = {
     
     // Proxy configuration for local development
     proxyConfiguration: {
-        enabled: false,
-        proxies: [],
+        enabled: true, // Enable for testing
+        proxies: [
+            // Add your test proxies here
+            { host: '8.8.8.8', port: 8080 },
+            { host: '1.1.1.1', port: 8080 }
+        ],
         rotationStrategy: 'round_robin',
         maxFailures: 3
     },

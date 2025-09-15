@@ -149,6 +149,10 @@ createBackupIfExists(CONFIG.OUTPUT.getFilename(), CONFIG);
 const playwrightCookies = convertCookiesToPlaywrightFormat(CONFIG.COOKIES);
 
 // Initialize proxy manager with configuration
+console.log('🔧 Proxy Configuration Debug:');
+console.log('   Input proxyConfiguration:', JSON.stringify(input.proxyConfiguration, null, 2));
+console.log('   CONFIG.PROXY:', JSON.stringify(CONFIG.PROXY, null, 2));
+
 const proxyManager = createProxyManager(CONFIG.PROXY);
 
 // Generate browser fingerprint for this session
@@ -159,6 +163,11 @@ const crawler = new PlaywrightCrawler({
         launchOptions: {
             headless: CONFIG.CRAWLER.headless,
             ignoreHTTPSErrors: true,
+            // Set viewport size for consistent browser window dimensions
+            viewport: {
+                width: browserFingerprint.viewport.width,
+                height: browserFingerprint.viewport.height
+            },
             args: [
                 ...getStealthBrowserArgs(),
                 `--user-agent=${browserFingerprint.userAgent}`,
@@ -184,11 +193,19 @@ const crawler = new PlaywrightCrawler({
         },
         preLaunchHooks: [
             async (pageId, launchContext) => {
+                console.log(`🔧 PreLaunch Hook Debug for pageId: ${pageId}`);
+                console.log(`   CONFIG.PROXY.enabled: ${CONFIG.PROXY.enabled}`);
+                console.log(`   Proxy manager proxies count: ${proxyManager.proxies.length}`);
+                
                 // Get proxy for this browser instance if enabled
                 if (CONFIG.PROXY.enabled) {
                     const proxy = proxyManager.getNextProxy();
+                    console.log(`   Next proxy:`, proxy);
+                    
                     if (proxy) {
                         const playwrightProxy = proxyManager.toPlaywrightFormat(proxy);
+                        console.log(`   Playwright proxy format:`, playwrightProxy);
+                        
                         if (playwrightProxy) {
                             launchContext.launchOptions.proxy = playwrightProxy;
                             console.log(`🌐 Using proxy: ${proxy.host}:${proxy.port}`);
@@ -200,8 +217,14 @@ const crawler = new PlaywrightCrawler({
                                 proxyHost: proxy.host,
                                 proxyPort: proxy.port
                             };
+                        } else {
+                            console.log(`❌ Failed to convert proxy to Playwright format`);
                         }
+                    } else {
+                        console.log(`❌ No proxy available from proxy manager`);
                     }
+                } else {
+                    console.log(`❌ Proxy is disabled in configuration`);
                 }
                 
                 launchContext.launchOptions = {
@@ -219,9 +242,40 @@ const crawler = new PlaywrightCrawler({
     },
     // Add pre-navigation handler to set cookies and configure stealth
     preNavigationHooks: [
-        async ({ page, request }) => {
+        async ({ page, request, gotoOptions }) => {
             // Configure stealth page
             await configureStealthPage(page, browserFingerprint);
+            
+            // Set viewport size for consistent rendering
+            await page.setViewportSize({ 
+                width: CONFIG.CRAWLER.viewportWidth || browserFingerprint.viewport.width, 
+                height: CONFIG.CRAWLER.viewportHeight || browserFingerprint.viewport.height 
+            });
+            
+            // Block unnecessary resources for better performance
+            await page.route('**/*', (route) => {
+                const resourceType = route.request().resourceType();
+                const url = route.request().url();
+                
+                // Block images, fonts, and stylesheets to speed up loading
+                if (['image', 'font', 'stylesheet'].includes(resourceType) || 
+                    url.includes('.css') || 
+                    url.includes('.woff') || 
+                    url.includes('.woff2') ||
+                    url.includes('.png') ||
+                    url.includes('.jpg') ||
+                    url.includes('.jpeg') ||
+                    url.includes('.gif') ||
+                    url.includes('.svg')) {
+                    route.abort();
+                } else {
+                    route.continue();
+                }
+            });
+            
+            // Set navigation options for faster loading
+            gotoOptions.waitUntil = 'domcontentloaded'; // Faster than 'load'
+            gotoOptions.timeout = CONFIG.CRAWLER.timeout;
             
             // Set cookies before navigation if we have any
             if (playwrightCookies.length > 0) {
@@ -246,12 +300,30 @@ const crawler = new PlaywrightCrawler({
             errorScoreDecrement: 0.5, // Slower error recovery
         }
     },
-    // Add delays between requests to avoid being detected as a bot
+    // Timeout configurations
     requestHandlerTimeoutSecs: CONFIG.PROXY.maxRequestTimeout * 1000, // Use maxRequestTimeout from input
     navigationTimeoutSecs: CONFIG.PROXY.maxRequestTimeout, // Use maxRequestTimeout from input
-    // Add random delays between requests
-    minConcurrency: 1,
-    maxConcurrency: 1,
+    
+    // Concurrency settings for better performance control
+    minConcurrency: CONFIG.CRAWLER.minConcurrency || 1,
+    maxConcurrency: CONFIG.CRAWLER.maxConcurrency || 1,
+    
+    // Request rate limiting to avoid overwhelming the target site
+    maxRequestsPerMinute: CONFIG.CRAWLER.maxRequestsPerMinute || 60,
+    
+    // Autoscaled pool configuration for dynamic concurrency adjustment
+    autoscaledPoolOptions: {
+        scaleUpStepRatio: CONFIG.CRAWLER.scaleUpStepRatio || 0.1,
+        scaleDownStepRatio: CONFIG.CRAWLER.scaleDownStepRatio || 0.1,
+        autoscaleIntervalSecs: CONFIG.CRAWLER.autoscaleIntervalSecs || 10,
+        desiredConcurrencyRatio: CONFIG.CRAWLER.desiredConcurrencyRatio || 0.9,
+        systemStatusOptions: {
+            maxEventLoopDelay: CONFIG.CRAWLER.maxEventLoopDelay || 50,
+            maxMemoryRatio: CONFIG.CRAWLER.maxMemoryRatio || 0.7,
+            maxCpuRatio: CONFIG.CRAWLER.maxCpuRatio || 0.7,
+            maxClientErrors: CONFIG.CRAWLER.maxClientErrors || 10
+        }
+    },
     // Enable retry on blocked requests
     retryOnBlocked: true,
     // Handle failed requests with retry logic
