@@ -66,6 +66,13 @@ export const CONFIG = {
             humanLikeDelays: true,
             mouseMovementSimulation: true,
             scrollSimulation: true
+        },
+        // Proxy configuration
+        proxy: {
+            enabled: false,
+            proxies: [],
+            rotationStrategy: 'round_robin', // 'round_robin', 'random', 'least_used'
+            maxFailures: 3
         }
     },
 

@@ -124,6 +124,12 @@ const CONFIG = {
         }
     },
     COOKIES: input.cookies && input.cookies.length > 0 ? input.cookies : (LOCAL_CONFIG.cookies || []),
+    PROXY: {
+        enabled: input.proxyConfiguration?.enabled || false,
+        proxies: input.proxyConfiguration?.proxies || [],
+        rotationStrategy: input.proxyConfiguration?.rotationStrategy || 'round_robin',
+        maxFailures: input.proxyConfiguration?.maxFailures || 3
+    }
 };
 
 // Starting crawler silently
@@ -140,8 +146,8 @@ createBackupIfExists(CONFIG.OUTPUT.getFilename(), CONFIG);
 // Convert cookies to Playwright format
 const playwrightCookies = convertCookiesToPlaywrightFormat(CONFIG.COOKIES);
 
-// Initialize proxy manager
-const proxyManager = createProxyManager();
+// Initialize proxy manager with configuration
+const proxyManager = createProxyManager(CONFIG.PROXY);
 
 // Generate browser fingerprint for this session
 const browserFingerprint = generateBrowserFingerprint();
@@ -176,12 +182,23 @@ const crawler = new PlaywrightCrawler({
         },
         preLaunchHooks: [
             async (pageId, launchContext) => {
-                // Get proxy for this browser instance
-                const proxy = proxyManager.getNextProxy();
-                if (proxy) {
-                    const playwrightProxy = proxyManager.toPlaywrightFormat(proxy);
-                    if (playwrightProxy) {
-                        launchContext.launchOptions.proxy = playwrightProxy;
+                // Get proxy for this browser instance if enabled
+                if (CONFIG.PROXY.enabled) {
+                    const proxy = proxyManager.getNextProxy();
+                    if (proxy) {
+                        const playwrightProxy = proxyManager.toPlaywrightFormat(proxy);
+                        if (playwrightProxy) {
+                            launchContext.launchOptions.proxy = playwrightProxy;
+                            console.log(`🌐 Using proxy: ${proxy.host}:${proxy.port}`);
+                            
+                            // Store proxy info for tracking
+                            launchContext.userData = {
+                                ...launchContext.userData,
+                                proxyId: proxy.id,
+                                proxyHost: proxy.host,
+                                proxyPort: proxy.port
+                            };
+                        }
                     }
                 }
                 
@@ -238,12 +255,27 @@ const crawler = new PlaywrightCrawler({
     // Handle failed requests with retry logic
     failedRequestHandler: async ({ request, error }) => {
         console.log(`❌ Failed: ${request.url}`);
+        
+        // Handle proxy failures if proxy is enabled
+        if (CONFIG.PROXY.enabled && error.message.includes('proxy')) {
+            // Extract proxy info from error or request context
+            const proxyId = request.userData?.proxyId;
+            if (proxyId) {
+                proxyManager.markProxyFailed(proxyId);
+                console.log(`🚫 Marked proxy as failed: ${proxyId}`);
+            }
+        }
     },
     // Increase max retries but with specific conditions
     maxRequestRetries: 5,
     requestHandler: async ({ page, request, enqueueLinks }) => {
         const startTime = Date.now();
         console.log(`\n🔍 Processing: ${request.url}`);
+        
+        // Track proxy success if proxy is enabled
+        if (CONFIG.PROXY.enabled && request.userData?.proxyId) {
+            proxyManager.markProxySuccess(request.userData.proxyId);
+        }
         
         // Check for bot protection
         const isBotDetected = await detectBotProtection(page);
@@ -445,6 +477,16 @@ const crawler = new PlaywrightCrawler({
 });
 
 await crawler.run([CONFIG.SITE.startUrl]);
+
+// Log proxy statistics if proxy is enabled
+if (CONFIG.PROXY.enabled) {
+    const proxyStats = proxyManager.getStats();
+    console.log(`\n📊 Proxy Statistics:`);
+    console.log(`   Total proxies: ${proxyStats.total}`);
+    console.log(`   Available proxies: ${proxyStats.available}`);
+    console.log(`   Failed proxies: ${proxyStats.failed}`);
+    console.log(`   Average success rate: ${(proxyStats.successRate * 100).toFixed(1)}%`);
+}
 
 // Save extracted data to JSON file
 const outputPath = await saveDataToFile(extractedData, CONFIG, CONFIG.COOKIES);

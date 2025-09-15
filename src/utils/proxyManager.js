@@ -7,11 +7,17 @@
  * Proxy configuration and management
  */
 export class ProxyManager {
-    constructor() {
+    constructor(config = {}) {
         this.proxies = [];
         this.currentProxyIndex = 0;
         this.failedProxies = new Set();
         this.proxyStats = new Map();
+        this.config = {
+            enabled: config.enabled || false,
+            rotationStrategy: config.rotationStrategy || 'round_robin',
+            maxFailures: config.maxFailures || 3,
+            ...config
+        };
     }
 
     /**
@@ -54,18 +60,18 @@ export class ProxyManager {
     }
 
     /**
-     * Get next available proxy
+     * Get next available proxy based on rotation strategy
      * @returns {Object|null} Proxy configuration or null
      */
     getNextProxy() {
-        if (this.proxies.length === 0) {
+        if (!this.config.enabled || this.proxies.length === 0) {
             return null;
         }
 
         // Filter out failed proxies
         const availableProxies = this.proxies.filter(proxy => 
             !this.failedProxies.has(proxy.id) && 
-            proxy.failures < 3
+            proxy.failures < this.config.maxFailures
         );
 
         if (availableProxies.length === 0) {
@@ -74,20 +80,61 @@ export class ProxyManager {
             return this.proxies[0] || null;
         }
 
-        // Sort by success rate and last used time
-        availableProxies.sort((a, b) => {
-            if (a.successRate !== b.successRate) {
-                return b.successRate - a.successRate;
-            }
+        let selectedProxy;
+
+        switch (this.config.rotationStrategy) {
+            case 'random':
+                selectedProxy = this.getRandomProxy(availableProxies);
+                break;
+            case 'least_used':
+                selectedProxy = this.getLeastUsedProxy(availableProxies);
+                break;
+            case 'round_robin':
+            default:
+                selectedProxy = this.getRoundRobinProxy(availableProxies);
+                break;
+        }
+
+        if (selectedProxy) {
+            selectedProxy.lastUsed = Date.now();
+        }
+
+        return selectedProxy;
+    }
+
+    /**
+     * Get random proxy from available proxies
+     * @param {Array} availableProxies - Array of available proxies
+     * @returns {Object} Random proxy
+     */
+    getRandomProxy(availableProxies) {
+        const randomIndex = Math.floor(Math.random() * availableProxies.length);
+        return availableProxies[randomIndex];
+    }
+
+    /**
+     * Get least used proxy from available proxies
+     * @param {Array} availableProxies - Array of available proxies
+     * @returns {Object} Least used proxy
+     */
+    getLeastUsedProxy(availableProxies) {
+        return availableProxies.sort((a, b) => {
             if (!a.lastUsed && !b.lastUsed) return 0;
             if (!a.lastUsed) return -1;
             if (!b.lastUsed) return 1;
             return a.lastUsed - b.lastUsed;
-        });
+        })[0];
+    }
 
-        const selectedProxy = availableProxies[0];
-        selectedProxy.lastUsed = Date.now();
-        return selectedProxy;
+    /**
+     * Get next proxy in round-robin fashion
+     * @param {Array} availableProxies - Array of available proxies
+     * @returns {Object} Next proxy in sequence
+     */
+    getRoundRobinProxy(availableProxies) {
+        const proxy = availableProxies[this.currentProxyIndex % availableProxies.length];
+        this.currentProxyIndex++;
+        return proxy;
     }
 
     /**
@@ -100,7 +147,7 @@ export class ProxyManager {
             proxy.failures++;
             proxy.successRate = Math.max(0, proxy.successRate - 0.1);
             
-            if (proxy.failures >= 3) {
+            if (proxy.failures >= this.config.maxFailures) {
                 this.failedProxies.add(proxyId);
             }
         }
@@ -178,12 +225,21 @@ export const DEFAULT_PROXIES = [
 ];
 
 /**
- * Create proxy manager with default configuration
+ * Create proxy manager with configuration
+ * @param {Object} config - Proxy configuration
  * @returns {ProxyManager} Configured proxy manager
  */
-export function createProxyManager() {
-    const manager = new ProxyManager();
-    manager.addProxies(DEFAULT_PROXIES);
+export function createProxyManager(config = {}) {
+    const manager = new ProxyManager(config);
+    
+    // Add proxies from config if provided
+    if (config.proxies && Array.isArray(config.proxies)) {
+        manager.addProxies(config.proxies);
+    } else {
+        // Fallback to default proxies if no config provided
+        manager.addProxies(DEFAULT_PROXIES);
+    }
+    
     return manager;
 }
 

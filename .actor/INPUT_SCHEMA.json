@@ -17,6 +17,64 @@
             "description": "Custom filename for the output JSON file (without .json extension). If not provided, will use default naming.",
             "editor": "textfield",
             "prefill": "mtalvernia-scraped-data"
+        },
+        "proxyConfiguration": {
+            "title": "🌐 Proxy Configuration",
+            "type": "object",
+            "description": "Configure proxy settings for web scraping. Leave empty to disable proxy usage.",
+            "properties": {
+                "enabled": {
+                    "title": "Enable Proxy",
+                    "type": "boolean",
+                    "description": "Enable proxy usage for web scraping",
+                    "default": false
+                },
+                "proxies": {
+                    "title": "Proxy List",
+                    "type": "array",
+                    "description": "List of proxy servers to use for rotation",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "host": {
+                                "title": "Host",
+                                "type": "string",
+                                "description": "Proxy server hostname or IP address"
+                            },
+                            "port": {
+                                "title": "Port",
+                                "type": "number",
+                                "description": "Proxy server port number"
+                            },
+                            "username": {
+                                "title": "Username (Optional)",
+                                "type": "string",
+                                "description": "Proxy authentication username"
+                            },
+                            "password": {
+                                "title": "Password (Optional)",
+                                "type": "string",
+                                "description": "Proxy authentication password"
+                            }
+                        },
+                        "required": ["host", "port"]
+                    }
+                },
+                "rotationStrategy": {
+                    "title": "Rotation Strategy",
+                    "type": "string",
+                    "description": "How to rotate between proxies",
+                    "enum": ["round_robin", "random", "least_used"],
+                    "default": "round_robin"
+                },
+                "maxFailures": {
+                    "title": "Max Failures per Proxy",
+                    "type": "number",
+                    "description": "Maximum number of failures before marking proxy as failed",
+                    "default": 3,
+                    "minimum": 1
+                }
+            }
         }
     },
     "required": []
