@@ -30,8 +30,16 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
             console.log(`🆕 Starting fresh browser for: ${entityUrl} (attempt ${attempt}/${maxRetries})`);
             
             // Get proxy configuration for this request
-            const proxyUrl = proxyManager.getNextProxy(config.PROXY?.rotation || 'perRequest');
-            const proxyConfig = proxyManager.getPlaywrightProxyConfig(proxyUrl);
+            let proxyConfig = {};
+            let proxyUrl = null;
+            if (config.PROXY?.apifyProxyConfig) {
+                // Apify handles proxy configuration internally
+                console.log('🌐 Using Apify proxy configuration for fresh browser');
+            } else {
+                // Use custom proxy configuration for local development
+                proxyUrl = proxyManager.getNextProxy(config.PROXY?.rotation || 'perRequest');
+                proxyConfig = proxyManager.getPlaywrightProxyConfig(proxyUrl);
+            }
             
             // Create fresh browser instance with proxy if configured
             const launchOptions = {
@@ -60,7 +68,7 @@ async function extractEntityWithFreshBrowser(entityUrl, config) {
                 ]
             };
 
-            // Add proxy configuration if available
+            // Add proxy configuration if available (only for local development)
             if (proxyConfig.server) {
                 launchOptions.proxy = proxyConfig;
                 console.log(`🌐 Using proxy: ${proxyManager.maskProxyUrl(proxyUrl)}`);
@@ -340,6 +348,11 @@ function convertCookiesToPlaywrightFormat(cookies) {
 // Get configuration based on environment (Apify or local)
 const { input, isApify, Actor } = await getConfiguration();
 
+// Debug logging for proxy configuration
+console.log('🔍 Input received:', JSON.stringify(input, null, 2));
+console.log('🔍 Is Apify environment:', isApify);
+console.log('🔍 Proxy configuration in input:', input.proxyConfiguration);
+
 // No input validation needed - all settings come from local config
 
 // Import local configuration for hardcoded values
@@ -407,19 +420,21 @@ const CONFIG = {
     },
     COOKIES: LOCAL_CONFIG.cookies || [],
     PROXY: {
-        // Merge input proxy configuration with local config
-        enabled: input.proxyConfiguration?.useProxy || LOCAL_CONFIG.proxy?.enabled || false,
-        urls: input.proxyConfiguration?.proxyUrls || LOCAL_CONFIG.proxy?.urls || [],
-        country: input.proxyConfiguration?.proxyCountry || LOCAL_CONFIG.proxy?.country || 'US',
-        rotation: input.proxyConfiguration?.proxyRotation || LOCAL_CONFIG.proxy?.rotation || 'perRequest',
-        retryCount: input.proxyConfiguration?.proxyRetryCount || LOCAL_CONFIG.proxy?.retryCount || 3,
-        timeout: (input.proxyConfiguration?.proxyTimeout || LOCAL_CONFIG.proxy?.timeout || 30) * 1000, // Convert to milliseconds
+        // Handle Apify proxy configuration vs local config
+        enabled: isApify ? !!input.proxyConfiguration : (LOCAL_CONFIG.proxy?.enabled || false),
+        urls: isApify ? [] : (LOCAL_CONFIG.proxy?.urls || []), // Apify handles proxy URLs internally
+        country: isApify ? (input.proxyConfiguration?.country || 'US') : (LOCAL_CONFIG.proxy?.country || 'US'),
+        rotation: isApify ? (input.proxyConfiguration?.rotation || 'perRequest') : (LOCAL_CONFIG.proxy?.rotation || 'perRequest'),
+        retryCount: isApify ? (input.proxyConfiguration?.retryCount || 3) : (LOCAL_CONFIG.proxy?.retryCount || 3),
+        timeout: isApify ? ((input.proxyConfiguration?.timeout || 30) * 1000) : ((LOCAL_CONFIG.proxy?.timeout || 30) * 1000),
         retryDelay: LOCAL_CONFIG.proxy?.retryDelay || 5000,
         bypassUrls: LOCAL_CONFIG.proxy?.bypassUrls || [],
         maxConcurrentRequests: LOCAL_CONFIG.proxy?.maxConcurrentRequests || 1,
         healthCheckInterval: LOCAL_CONFIG.proxy?.healthCheckInterval || 60000,
         blacklistFailedProxies: LOCAL_CONFIG.proxy?.blacklistFailedProxies !== false,
-        blacklistDuration: LOCAL_CONFIG.proxy?.blacklistDuration || 300000
+        blacklistDuration: LOCAL_CONFIG.proxy?.blacklistDuration || 300000,
+        // Apify-specific proxy configuration
+        apifyProxyConfig: isApify ? input.proxyConfiguration : null
     }
 };
 
@@ -451,10 +466,20 @@ if (playwrightCookies.length > 0) {
 }
 
 // Get initial proxy configuration for main crawler
-const mainProxyUrl = proxyManager.getNextProxy(CONFIG.PROXY?.rotation || 'perRequest');
-const mainProxyConfig = proxyManager.getPlaywrightProxyConfig(mainProxyUrl);
+let mainProxyConfig = {};
+if (isApify && CONFIG.PROXY.apifyProxyConfig) {
+    // Use Apify's proxy configuration
+    console.log('🌐 Using Apify proxy configuration');
+    // Apify handles proxy configuration internally through the Actor
+} else {
+    // Use custom proxy configuration for local development
+    const mainProxyUrl = proxyManager.getNextProxy(CONFIG.PROXY?.rotation || 'perRequest');
+    mainProxyConfig = proxyManager.getPlaywrightProxyConfig(mainProxyUrl);
+}
 
 const crawler = new PlaywrightCrawler({
+    // Use Apify proxy configuration if available
+    ...(isApify && CONFIG.PROXY.apifyProxyConfig && { proxyConfiguration: CONFIG.PROXY.apifyProxyConfig }),
     launchContext: {
         launchOptions: {
             ignoreHTTPSErrors: true,
