@@ -17,55 +17,7 @@
             "title": "🌐 Proxy Configuration",
             "type": "object",
             "description": "Configure proxy settings for the crawler",
-            "editor": "proxy",
-            "properties": {
-                "useProxy": {
-                    "title": "Enable Proxy",
-                    "type": "boolean",
-                    "description": "Enable proxy usage for requests",
-                    "editor": "checkbox"
-                },
-                "proxyUrls": {
-                    "title": "Proxy URLs",
-                    "type": "array",
-                    "description": "List of proxy URLs (e.g., http://username:password@proxy.example.com:8080). Enter one proxy URL per line.",
-                    "items": {
-                        "type": "string",
-                        "pattern": "^https?://.*"
-                    },
-                    "editor": "stringList"
-                },
-                "proxyCountry": {
-                    "title": "Proxy Country",
-                    "type": "string",
-                    "description": "Country code for proxy selection (e.g., US, GB, DE)",
-                    "pattern": "^[A-Z]{2}$",
-                    "editor": "textfield"
-                },
-                "proxyRotation": {
-                    "title": "Proxy Rotation",
-                    "type": "string",
-                    "description": "How to rotate between proxies",
-                    "enum": ["perRequest", "perPage", "perSession"],
-                    "editor": "select"
-                },
-                "proxyRetryCount": {
-                    "title": "Proxy Retry Count",
-                    "type": "integer",
-                    "description": "Number of times to retry with different proxy on failure",
-                    "minimum": 0,
-                    "maximum": 10,
-                    "editor": "number"
-                },
-                "proxyTimeout": {
-                    "title": "Proxy Timeout (seconds)",
-                    "type": "integer",
-                    "description": "Timeout for proxy connections in seconds",
-                    "minimum": 5,
-                    "maximum": 300,
-                    "editor": "number"
-                }
-            }
+            "editor": "proxy"
         }
     },
     "required": [
