@@ -36,7 +36,10 @@ export async function getConfiguration() {
         
         // Convert local config to Apify input format
         const input = {
-            outputFilename: LOCAL_CONFIG.outputFilename || ''
+            outputFilename: LOCAL_CONFIG.outputFilename || '',
+            maxRotationPerSession: LOCAL_CONFIG.maxRotationPerSession || 10,
+            maxRetries: LOCAL_CONFIG.maxRetries || 3,
+            maxRequestTimeout: LOCAL_CONFIG.maxRequestTimeout || 30
         };
         
         return { input, isApify: false, Actor: null };

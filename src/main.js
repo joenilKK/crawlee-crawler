@@ -375,14 +375,15 @@ const CONFIG = {
     CRAWLER: {
         maxRequestsPerCrawl: process.env.MAX_REQUESTS ? parseInt(process.env.MAX_REQUESTS) : LOCAL_CONFIG.maxRequestsPerCrawl,
         headless: LOCAL_CONFIG.headless,
-        timeout: LOCAL_CONFIG.timeout,
-        maxRetries: LOCAL_CONFIG.maxRetries,
+        timeout: input.maxRequestTimeout ? input.maxRequestTimeout * 1000 : LOCAL_CONFIG.timeout, // Convert seconds to milliseconds
+        maxRetries: input.maxRetries || LOCAL_CONFIG.maxRetries,
         browserRestartCount: LOCAL_CONFIG.browserRestartCount,
         requestInterval: LOCAL_CONFIG.requestInterval,
         pageInterval: LOCAL_CONFIG.pageInterval,
         retryInterval: LOCAL_CONFIG.retryInterval,
         entityInterval: LOCAL_CONFIG.entityInterval,
         userAgent: LOCAL_CONFIG.userAgent,
+        maxRotationPerSession: input.maxRotationPerSession || LOCAL_CONFIG.maxRotationPerSession || 10,
         labels: {
             DETAIL: 'DETAIL',
             SPECIALISTS_LIST: 'SPECIALISTS_LIST'

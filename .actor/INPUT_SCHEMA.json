@@ -18,6 +18,33 @@
             "type": "object",
             "description": "Configure proxy settings for the crawler",
             "editor": "proxy"
+        },
+        "maxRotationPerSession": {
+            "title": "🔄 Max Rotation Per Session",
+            "type": "integer",
+            "description": "Maximum number of proxy rotations allowed per session",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 10,
+            "editor": "number"
+        },
+        "maxRetries": {
+            "title": "🔄 Max Retries for Server/Network Errors",
+            "type": "integer",
+            "description": "Maximum number of retries for server or network errors",
+            "minimum": 0,
+            "maximum": 20,
+            "default": 3,
+            "editor": "number"
+        },
+        "maxRequestTimeout": {
+            "title": "⏱️ Max Request Timeout (seconds)",
+            "type": "integer",
+            "description": "Maximum timeout for individual requests in seconds",
+            "minimum": 5,
+            "maximum": 300,
+            "default": 30,
+            "editor": "number"
         }
     },
     "required": [

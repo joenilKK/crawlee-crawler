@@ -38,6 +38,8 @@ export const LOCAL_CONFIG = {
     timeout: 100000, // Request timeout in milliseconds (increased for stability)
     maxRetries: 3, // Number of retry attempts for failed entity extractions
     browserRestartCount: 1, // Restart browser after EVERY page to completely eliminate persistence issues
+    maxRotationPerSession: 10, // Maximum proxy rotations per session
+    maxRequestTimeout: 30, // Maximum request timeout in seconds
     
     // Request intervals to prevent overwhelming the server (more conservative)
     requestInterval: 8000, // Wait 8 seconds between each entity request (in milliseconds)

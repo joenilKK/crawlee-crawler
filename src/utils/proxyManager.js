@@ -11,6 +11,8 @@ export class ProxyManager {
         this.failedProxies = new Map(); // Track failed proxies with timestamps
         this.proxyStats = new Map(); // Track proxy usage statistics
         this.lastHealthCheck = 0;
+        this.sessionRotationCount = 0; // Track rotations per session
+        this.maxRotationPerSession = config.crawler?.maxRotationPerSession || 10;
         
         // Validate proxy configuration
         this.validateConfig();
@@ -61,6 +63,12 @@ export class ProxyManager {
             return null;
         }
 
+        // Check rotation limit for perRequest rotation
+        if (rotationType === 'perRequest' && this.sessionRotationCount >= this.maxRotationPerSession) {
+            console.warn(`⚠️ Maximum rotations per session (${this.maxRotationPerSession}) reached. Using last proxy.`);
+            return this.lastUsedProxy || null;
+        }
+
         // Clean up expired blacklisted proxies
         this.cleanupBlacklistedProxies();
 
@@ -79,6 +87,7 @@ export class ProxyManager {
                 // Round-robin selection
                 selectedProxy = availableProxies[this.currentProxyIndex % availableProxies.length];
                 this.currentProxyIndex = (this.currentProxyIndex + 1) % availableProxies.length;
+                this.sessionRotationCount++;
                 break;
                 
             case 'perPage':
@@ -101,10 +110,13 @@ export class ProxyManager {
                 selectedProxy = availableProxies[0];
         }
 
+        // Store last used proxy for rotation limit fallback
+        this.lastUsedProxy = selectedProxy;
+
         // Update statistics
         this.updateProxyStats(selectedProxy);
         
-        console.log(`🌐 Using proxy: ${this.maskProxyUrl(selectedProxy)}`);
+        console.log(`🌐 Using proxy: ${this.maskProxyUrl(selectedProxy)} (rotation ${this.sessionRotationCount}/${this.maxRotationPerSession})`);
         return selectedProxy;
     }
 
@@ -217,6 +229,8 @@ export class ProxyManager {
      */
     resetRotation() {
         this.currentPageProxy = null;
+        this.sessionRotationCount = 0;
+        this.lastUsedProxy = null;
         console.log('🔄 Proxy rotation reset for new page/session');
     }
 
