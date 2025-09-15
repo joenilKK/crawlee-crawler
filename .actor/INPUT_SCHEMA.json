@@ -39,8 +39,7 @@
                     "type": "string",
                     "description": "Country code for proxy selection (e.g., US, GB, DE)",
                     "pattern": "^[A-Z]{2}$",
-                    "editor": "textfield",
-                    "prefill": "US"
+                    "editor": "textfield"
                 },
                 "proxyRotation": {
                     "title": "Proxy Rotation",
