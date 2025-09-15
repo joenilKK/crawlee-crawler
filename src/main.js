@@ -12,98 +12,119 @@ import {
 } from './config/environment.js';
 
 /**
- * Extract data from a single entity using a fresh browser instance
+ * Extract data from a single entity using a fresh browser instance with retry logic
  * @param {string} entityUrl - URL of the entity to extract
  * @param {Object} config - Configuration object
  * @returns {Object} - Extracted entity data or error info
  */
 async function extractEntityWithFreshBrowser(entityUrl, config) {
-    let browser = null;
-    let page = null;
+    const maxRetries = config.CRAWLER?.maxRetries || 3;
+    let lastError = null;
     
-    try {
-        console.log(`🆕 Starting fresh browser for: ${entityUrl}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        let browser = null;
+        let page = null;
         
-        // Create fresh browser instance
-        browser = await chromium.launch({
-            headless: config.LOCAL_CONFIG?.headless !== false,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--disable-web-security', // Help prevent ad interference
-                '--disable-features=VizDisplayCompositor', // Reduce ad rendering issues
-                '--no-zygote',
-                '--disable-gpu',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--memory-pressure-off',
-                '--max_old_space_size=2048',
-                '--no-crash-upload',
-                '--disable-breakpad',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-default-apps',
-                '--disable-sync'
-            ]
-        });
-        
-        page = await browser.newPage();
-        
-        // Block ads and trackers to prevent interference
-        await page.route('**/*', (route) => {
-            const url = route.request().url();
-            if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication'))) {
-                route.abort();
-            } else {
-                route.continue();
-            }
-        });
-        
-        // Set timeouts
-        page.setDefaultTimeout(config.LOCAL_CONFIG?.timeout || 10000);
-        page.setDefaultNavigationTimeout(config.LOCAL_CONFIG?.timeout || 10000);
-        
-        // Navigate to entity page
-        console.log(`📄 Navigating to: ${entityUrl}`);
-        await page.goto(entityUrl, { waitUntil: 'networkidle' });
-        
-        // Wait a bit for page to stabilize
-        await page.waitForTimeout(1000);
-        
-        // Extract data
-        console.log(`🔍 Extracting data from: ${entityUrl}`);
-        const entityData = await extractSpecialistData(page, entityUrl, config);
-        entityData.url = entityUrl;
-        
-        console.log(`✅ Successfully extracted: ${entityData.entityName || 'Unknown'}`);
-        return { success: true, data: entityData };
-        
-    } catch (error) {
-        console.error(`❌ Failed to extract ${entityUrl}:`, error.message);
-        return { 
-            success: false, 
-            error: error.message,
-            data: {
-                url: entityUrl,
-                entityName: 'Extraction failed',
-                overview: [],
-                error: error.message
-            }
-        };
-    } finally {
-        // Always cleanup
         try {
-            if (page) await page.close();
-            if (browser) await browser.close();
-            console.log(`🧹 Cleaned up browser for: ${entityUrl}`);
-        } catch (cleanupError) {
-            console.warn(`⚠️ Cleanup warning for ${entityUrl}:`, cleanupError.message);
+            console.log(`🆕 Starting fresh browser for: ${entityUrl} (attempt ${attempt}/${maxRetries})`);
+            
+            // Create fresh browser instance
+            browser = await chromium.launch({
+                headless: config.LOCAL_CONFIG?.headless !== false,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--disable-web-security', // Help prevent ad interference
+                    '--disable-features=VizDisplayCompositor', // Reduce ad rendering issues
+                    '--no-zygote',
+                    '--disable-gpu',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
+                    '--memory-pressure-off',
+                    '--max_old_space_size=2048',
+                    '--no-crash-upload',
+                    '--disable-breakpad',
+                    '--disable-extensions',
+                    '--disable-plugins',
+                    '--disable-default-apps',
+                    '--disable-sync'
+                ]
+            });
+            
+            page = await browser.newPage();
+            
+            // Block ads and trackers to prevent interference
+            await page.route('**/*', (route) => {
+                const url = route.request().url();
+                if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication'))) {
+                    route.abort();
+                } else {
+                    route.continue();
+                }
+            });
+            
+            // Set timeouts
+            page.setDefaultTimeout(config.LOCAL_CONFIG?.timeout || 10000);
+            page.setDefaultNavigationTimeout(config.LOCAL_CONFIG?.timeout || 10000);
+            
+            // Navigate to entity page with retry logic
+            console.log(`📄 Navigating to: ${entityUrl}`);
+            const response = await page.goto(entityUrl, { waitUntil: 'networkidle' });
+            
+            // Check if request was blocked
+            if (response && (response.status() === 403 || response.status() === 429 || response.status() === 503)) {
+                throw new Error(`Request blocked with status ${response.status()}`);
+            }
+            
+            // Wait a bit for page to stabilize
+            await page.waitForTimeout(1000);
+            
+            // Extract data
+            console.log(`🔍 Extracting data from: ${entityUrl}`);
+            const entityData = await extractSpecialistData(page, entityUrl, config);
+            entityData.url = entityUrl;
+            
+            console.log(`✅ Successfully extracted: ${entityData.entityName || 'Unknown'}`);
+            return { success: true, data: entityData };
+            
+        } catch (error) {
+            lastError = error;
+            console.error(`❌ Attempt ${attempt}/${maxRetries} failed for ${entityUrl}:`, error.message);
+            
+            // If this is not the last attempt, wait before retrying
+            if (attempt < maxRetries) {
+                const retryDelay = config.CRAWLER?.retryInterval || 5000;
+                console.log(`⏳ Waiting ${retryDelay}ms before retry...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+        } finally {
+            // Always cleanup
+            try {
+                if (page) await page.close();
+                if (browser) await browser.close();
+                console.log(`🧹 Cleaned up browser for: ${entityUrl}`);
+            } catch (cleanupError) {
+                console.warn(`⚠️ Cleanup warning for ${entityUrl}:`, cleanupError.message);
+            }
         }
     }
+    
+    // All retries failed
+    console.error(`❌ All ${maxRetries} attempts failed for ${entityUrl}`);
+    return { 
+        success: false, 
+        error: lastError?.message || 'Unknown error',
+        data: {
+            url: entityUrl,
+            entityName: 'Extraction failed',
+            overview: [],
+            error: lastError?.message || 'Unknown error'
+        }
+    };
 }
 
 /**
@@ -452,16 +473,18 @@ const crawler = new PlaywrightCrawler({
           },
       },
     },
+    
     // Handle session pool configuration
     sessionPoolOptions: {
         blockedStatusCodes: [], // Don't auto-block any status codes (including 403, 503)
         maxPoolSize: 1,
-        retryOnBlocked: true,
         sessionOptions: {
             maxErrorScore: 15, // Higher tolerance for "errors" 
             errorScoreDecrement: 0.3, // Slower error recovery
         }
     },
+    // Enable retry on blocked requests
+    retryOnBlocked: true,
     // Increase timeouts to prevent premature closures (increased for fresh browser approach)
     requestHandlerTimeoutSecs: 3600, // 1 hour for the main handler (to handle all 1100+ entities)
     navigationTimeoutSecs: 180, // 3 minutes for navigation
@@ -486,201 +509,232 @@ const crawler = new PlaywrightCrawler({
         while (hasMorePages) {
             console.log(`\n🔄 ==================== PROCESSING PAGE ${currentPage} ====================`);
             
+            const maxPageRetries = CONFIG.CRAWLER?.maxRetries || 3;
+            let pageProcessed = false;
+            let pageError = null;
+            
+            for (let pageAttempt = 1; pageAttempt <= maxPageRetries && !pageProcessed; pageAttempt++) {
+                try {
+                    console.log(`🔄 Processing page ${currentPage} (attempt ${pageAttempt}/${maxPageRetries})`);
+                    
+                    // Use fresh browser to get entity links for current page
+                    let currentPageUrl;
+                    if (currentPage === 1) {
+                        currentPageUrl = LOCAL_CONFIG.paginationBaseUrl || CONFIG.SITE.startUrl;
+                    } else {
+                        // Construct proper page URL using the pagination base URL
+                        const baseUrl = LOCAL_CONFIG.paginationBaseUrl || CONFIG.SITE.startUrl.replace(/[?&]page=\d+/, '');
+                        const separator = baseUrl.includes('?') ? '&' : '?';
+                        currentPageUrl = `${baseUrl}${separator}page=${currentPage}`;
+                    }
+                    
+                    let listingBrowser = null;
+                    let listingPage = null;
+                    let entityLinks = [];
+                    
+                    try {
+                        console.log(`🆕 Creating fresh browser for page ${currentPage}: ${currentPageUrl}`);
+                        listingBrowser = await chromium.launch({
+                            headless: LOCAL_CONFIG?.headless !== false,
+                            args: [
+                                '--no-sandbox',
+                                '--disable-setuid-sandbox',
+                                '--disable-dev-shm-usage',
+                                '--memory-pressure-off',
+                                '--disable-web-security', // Help prevent ad interference
+                                '--disable-features=VizDisplayCompositor' // Reduce ad rendering issues
+                            ]
+                        });
+                        
+                        listingPage = await listingBrowser.newPage();
+                        listingPage.setDefaultTimeout(LOCAL_CONFIG?.timeout || 30000);
+                        
+                        // Block ads and trackers to prevent interference
+                        await listingPage.route('**/*', (route) => {
+                            const url = route.request().url();
+                            if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication'))) {
+                                route.abort();
+                            } else {
+                                route.continue();
+                            }
+                        });
+                        
+                        // Navigate with retry logic for blocked requests
+                        const response = await listingPage.goto(currentPageUrl, { waitUntil: 'networkidle' });
+                        
+                        // Check if request was blocked
+                        if (response && (response.status() === 403 || response.status() === 429 || response.status() === 503)) {
+                            throw new Error(`Request blocked with status ${response.status()}`);
+                        }
+                        
+                        await listingPage.waitForTimeout(2000);
+                        
+                        // Wait for the entity links to load
+                        await listingPage.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
+                        console.log(`✅ Entity links found on page ${currentPage}!`);
+                        
+                        // Get all entity links on current page
+                        entityLinks = await listingPage.evaluate((selector) => {
+                            const links = document.querySelectorAll(selector);
+                            return Array.from(links).map(link => link.href).filter(href => href);
+                        }, CONFIG.SELECTORS.specialistLinks);
+                        
+                    } finally {
+                        // Don't close the listing browser yet - we need it for pagination
+                        console.log(`📝 Keeping listing browser open for pagination check`);
+                    }
+                
+                    console.log(`Found ${entityLinks.length} entities on page ${currentPage}`);
+                    console.log(`🚀 Starting to process all ${entityLinks.length} entities from page ${currentPage}`);
+                    
+                    // Process each entity using fresh browser instances (eliminates ALL browser failures)
+                    for (let i = 0; i < entityLinks.length; i++) {
+                        const entityUrl = entityLinks[i];
+                        console.log(`\n📋 Processing entity ${i + 1}/${entityLinks.length} on page ${currentPage}`);
+                        
+                        // Add interval between requests to prevent overwhelming the server
+                        if (i > 0) {
+                            const interval = LOCAL_CONFIG.requestInterval || 5000;
+                            console.log(`⏳ Waiting ${interval}ms before processing next entity...`);
+                            await new Promise(resolve => setTimeout(resolve, interval));
+                        }
+                        
+                        // Extract data using fresh browser instance (eliminates all browser persistence issues)
+                        const result = await extractEntityWithFreshBrowser(entityUrl, CONFIG);
+                        
+                        // Add the data to our collection
+                        extractedData.push(result.data);
+                        
+                        // Save data after each extraction (incremental save)
+                        await saveDataToFile(extractedData, CONFIG);
+                        
+                        if (result.success) {
+                            console.log(`✅ Successfully completed entity ${i + 1}/${entityLinks.length}: ${result.data.entityName}`);
+                        } else {
+                            console.log(`⚠️ Failed entity ${i + 1}/${entityLinks.length}: ${entityUrl} (saved as error entry)`);
+                        }
+                        
+                        // Brief pause after each entity to be respectful to server
+                        const entityInterval = LOCAL_CONFIG.entityInterval || 3000;
+                        console.log(`⏳ Waiting ${entityInterval}ms after entity processing...`);
+                        await new Promise(resolve => setTimeout(resolve, entityInterval));
+                    }
+                    
+                    console.log(`✅ Completed all ${entityLinks.length} entities on page ${currentPage}`);
+                    pageProcessed = true; // Mark page as successfully processed
+                    
+                } catch (error) {
+                    pageError = error;
+                    console.error(`❌ Page ${currentPage} attempt ${pageAttempt}/${maxPageRetries} failed:`, error.message);
+                    
+                    // If this is not the last attempt, wait before retrying
+                    if (pageAttempt < maxPageRetries) {
+                        const retryDelay = CONFIG.CRAWLER?.retryInterval || 10000;
+                        console.log(`⏳ Waiting ${retryDelay}ms before retrying page ${currentPage}...`);
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    }
+                }
+            }
+            
+            // If page processing failed after all retries, skip to next page
+            if (!pageProcessed) {
+                console.error(`❌ Failed to process page ${currentPage} after ${maxPageRetries} attempts:`, pageError?.message);
+                console.log(`⏭️ Skipping to next page...`);
+                currentPage++;
+                continue;
+            }
+            
+            // Check for next page button and click it
+            console.log(`🔍 Looking for next page button after completing page ${currentPage}...`);
+            
             try {
-                // Use fresh browser to get entity links for current page
-                let currentPageUrl;
-                if (currentPage === 1) {
-                    currentPageUrl = LOCAL_CONFIG.paginationBaseUrl || CONFIG.SITE.startUrl;
-                } else {
-                    // Construct proper page URL using the pagination base URL
-                    const baseUrl = LOCAL_CONFIG.paginationBaseUrl || CONFIG.SITE.startUrl.replace(/[?&]page=\d+/, '');
-                    const separator = baseUrl.includes('?') ? '&' : '?';
-                    currentPageUrl = `${baseUrl}${separator}page=${currentPage}`;
-                }
+                // Look for the next button using the nextButtonSelector
+                const nextButtonSelector = LOCAL_CONFIG.nextButtonSelector;
+                console.log(`🔍 Looking for next button with selector: ${nextButtonSelector}`);
                 
-                let listingBrowser = null;
-                let listingPage = null;
-                let entityLinks = [];
+                const nextButton = await listingPage.$(nextButtonSelector);
                 
-                try {
-                    console.log(`🆕 Creating fresh browser for page ${currentPage}: ${currentPageUrl}`);
-                    listingBrowser = await chromium.launch({
-                        headless: LOCAL_CONFIG?.headless !== false,
-                        args: [
-                            '--no-sandbox',
-                            '--disable-setuid-sandbox',
-                            '--disable-dev-shm-usage',
-                            '--memory-pressure-off',
-                            '--disable-web-security', // Help prevent ad interference
-                            '--disable-features=VizDisplayCompositor' // Reduce ad rendering issues
-                        ]
-                    });
+                if (nextButton) {
+                    // Check the text content of the next button
+                    const buttonText = await listingPage.evaluate((button) => {
+                        return button.textContent.trim();
+                    }, nextButton);
                     
-                    listingPage = await listingBrowser.newPage();
-                    listingPage.setDefaultTimeout(LOCAL_CONFIG?.timeout || 30000);
+                    console.log(`🔍 Next button text: "${buttonText}"`);
                     
-                    // Block ads and trackers to prevent interference
-                    await listingPage.route('**/*', (route) => {
-                        const url = route.request().url();
-                        if (url.includes('google') && (url.includes('ads') || url.includes('doubleclick') || url.includes('googlesyndication'))) {
-                            route.abort();
-                        } else {
-                            route.continue();
-                        }
-                    });
-                    
-                    await listingPage.goto(currentPageUrl, { waitUntil: 'networkidle' });
-                    await listingPage.waitForTimeout(2000);
-                    
-                    // Wait for the entity links to load
-                    await listingPage.waitForSelector(CONFIG.SELECTORS.specialistLinks, { timeout: CONFIG.CRAWLER.timeout });
-                    console.log(`✅ Entity links found on page ${currentPage}!`);
-                    
-                    // Get all entity links on current page
-                    entityLinks = await listingPage.evaluate((selector) => {
-                        const links = document.querySelectorAll(selector);
-                        return Array.from(links).map(link => link.href).filter(href => href);
-                    }, CONFIG.SELECTORS.specialistLinks);
-                    
-                } finally {
-                    // Don't close the listing browser yet - we need it for pagination
-                    console.log(`📝 Keeping listing browser open for pagination check`);
-                }
-                
-                console.log(`Found ${entityLinks.length} entities on page ${currentPage}`);
-                console.log(`🚀 Starting to process all ${entityLinks.length} entities from page ${currentPage}`);
-                
-                // Process each entity using fresh browser instances (eliminates ALL browser failures)
-                for (let i = 0; i < entityLinks.length; i++) {
-                    const entityUrl = entityLinks[i];
-                    console.log(`\n📋 Processing entity ${i + 1}/${entityLinks.length} on page ${currentPage}`);
-                    
-                    // Add interval between requests to prevent overwhelming the server
-                    if (i > 0) {
-                        const interval = LOCAL_CONFIG.requestInterval || 5000;
-                        console.log(`⏳ Waiting ${interval}ms before processing next entity...`);
-                        await new Promise(resolve => setTimeout(resolve, interval));
-                    }
-                    
-                    // Extract data using fresh browser instance (eliminates all browser persistence issues)
-                    const result = await extractEntityWithFreshBrowser(entityUrl, CONFIG);
-                    
-                    // Add the data to our collection
-                    extractedData.push(result.data);
-                    
-                    // Save data after each extraction (incremental save)
-                    await saveDataToFile(extractedData, CONFIG);
-                    
-                    if (result.success) {
-                        console.log(`✅ Successfully completed entity ${i + 1}/${entityLinks.length}: ${result.data.entityName}`);
-                    } else {
-                        console.log(`⚠️ Failed entity ${i + 1}/${entityLinks.length}: ${entityUrl} (saved as error entry)`);
-                    }
-                    
-                    // Brief pause after each entity to be respectful to server
-                    const entityInterval = LOCAL_CONFIG.entityInterval || 3000;
-                    console.log(`⏳ Waiting ${entityInterval}ms after entity processing...`);
-                    await new Promise(resolve => setTimeout(resolve, entityInterval));
-                }
-                
-                console.log(`✅ Completed all ${entityLinks.length} entities on page ${currentPage}`);
-                
-                // Check for next page button and click it
-                console.log(`🔍 Looking for next page button after completing page ${currentPage}...`);
-                
-                try {
-                    // Look for the next button using the nextButtonSelector
-                    const nextButtonSelector = LOCAL_CONFIG.nextButtonSelector;
-                    console.log(`🔍 Looking for next button with selector: ${nextButtonSelector}`);
-                    
-                    const nextButton = await listingPage.$(nextButtonSelector);
-                    
-                    if (nextButton) {
-                        // Check the text content of the next button
-                        const buttonText = await listingPage.evaluate((button) => {
-                            return button.textContent.trim();
-                        }, nextButton);
-                        
-                        console.log(`🔍 Next button text: "${buttonText}"`);
-                        
-                        // If button text is NOT "Next Page", we've reached the last page
-                        if (buttonText !== "Next Page") {
-                            console.log(`🏁 Button text is "${buttonText}" (not "Next Page") - this is the last page of pagination`);
-                            console.log(`✅ Scraping completed! Successfully processed ${currentPage} pages total.`);
-                            hasMorePages = false;
-                            break; // Exit the pagination loop completely
-                        }
-                        
-                        // Button text IS "Next Page", so more pages are available
-                        console.log(`✅ Button text is "Next Page" - more pages available, proceeding to next page...`);
-                        
-                        // Also check if the next button is disabled
-                        const isDisabled = await listingPage.evaluate((button) => {
-                            const parentLi = button.closest('li');
-                            return button.disabled || 
-                                   button.classList.contains('disabled') || 
-                                   (parentLi && parentLi.classList.contains('disabled')) ||
-                                   button.getAttribute('aria-disabled') === 'true';
-                        }, nextButton);
-                        
-                        if (isDisabled) {
-                            console.log(`📄 Next button is disabled - reached end of pagination at page ${currentPage}`);
-                            hasMorePages = false;
-                            continue;
-                        }
-                        
-                        console.log(`🖱️ Found "Next Page" button - navigating to next page ${currentPage + 1}`);
-                        
-                        // Extract href and navigate directly (more reliable than clicking)
-                        const nextPageUrl = await listingPage.evaluate((selector) => {
-                            const button = document.querySelector(selector);
-                            return button ? button.href : null;
-                        }, nextButtonSelector);
-                        
-                        if (nextPageUrl) {
-                            console.log(`🌐 Navigating directly to: ${nextPageUrl}`);
-                            await listingPage.goto(nextPageUrl, { waitUntil: 'load', timeout: 60000 });
-                            currentPage++;
-                            console.log(`✅ Successfully navigated to page ${currentPage}`);
-                            
-                            // Wait a bit for the page to fully load
-                            const pageInterval = LOCAL_CONFIG.pageInterval || 10000;
-                            console.log(`⏳ Waiting ${pageInterval}ms for page ${currentPage} to fully load...`);
-                            await new Promise(resolve => setTimeout(resolve, pageInterval));
-                            
-                            // Continue to next iteration to process the new page
-                            continue;
-                        } else {
-                            console.log(`❌ Could not extract next page URL from button`);
-                            hasMorePages = false;
-                            break;
-                        }
-                        
-                    } else {
-                        console.log(`🏁 No next button found - this is the last page of pagination`);
+                    // If button text is NOT "Next Page", we've reached the last page
+                    if (buttonText !== "Next Page") {
+                        console.log(`🏁 Button text is "${buttonText}" (not "Next Page") - this is the last page of pagination`);
                         console.log(`✅ Scraping completed! Successfully processed ${currentPage} pages total.`);
                         hasMorePages = false;
                         break; // Exit the pagination loop completely
                     }
                     
-                } catch (nextButtonError) {
-                    console.log(`❌ Error clicking next button: ${nextButtonError.message}`);
-                    hasMorePages = false;
-                    continue;
-                } finally {
-                    // Clean up listing browser after pagination check
-                    try {
-                        if (listingPage) await listingPage.close();
-                        if (listingBrowser) await listingBrowser.close();
-                        console.log(`🧹 Cleaned up listing browser after pagination check`);
-                    } catch (cleanupError) {
-                        console.warn(`⚠️ Cleanup warning for listing browser:`, cleanupError.message);
+                    // Button text IS "Next Page", so more pages are available
+                    console.log(`✅ Button text is "Next Page" - more pages available, proceeding to next page...`);
+                    
+                    // Also check if the next button is disabled
+                    const isDisabled = await listingPage.evaluate((button) => {
+                        const parentLi = button.closest('li');
+                        return button.disabled || 
+                               button.classList.contains('disabled') || 
+                               (parentLi && parentLi.classList.contains('disabled')) ||
+                               button.getAttribute('aria-disabled') === 'true';
+                    }, nextButton);
+                    
+                    if (isDisabled) {
+                        console.log(`📄 Next button is disabled - reached end of pagination at page ${currentPage}`);
+                        hasMorePages = false;
+                        continue;
                     }
+                    
+                    console.log(`🖱️ Found "Next Page" button - navigating to next page ${currentPage + 1}`);
+                    
+                    // Extract href and navigate directly (more reliable than clicking)
+                    const nextPageUrl = await listingPage.evaluate((selector) => {
+                        const button = document.querySelector(selector);
+                        return button ? button.href : null;
+                    }, nextButtonSelector);
+                    
+                    if (nextPageUrl) {
+                        console.log(`🌐 Navigating directly to: ${nextPageUrl}`);
+                        await listingPage.goto(nextPageUrl, { waitUntil: 'load', timeout: 60000 });
+                        currentPage++;
+                        console.log(`✅ Successfully navigated to page ${currentPage}`);
+                        
+                        // Wait a bit for the page to fully load
+                        const pageInterval = LOCAL_CONFIG.pageInterval || 10000;
+                        console.log(`⏳ Waiting ${pageInterval}ms for page ${currentPage} to fully load...`);
+                        await new Promise(resolve => setTimeout(resolve, pageInterval));
+                        
+                        // Continue to next iteration to process the new page
+                        continue;
+                    } else {
+                        console.log(`❌ Could not extract next page URL from button`);
+                        hasMorePages = false;
+                        break;
+                    }
+                    
+                } else {
+                    console.log(`🏁 No next button found - this is the last page of pagination`);
+                    console.log(`✅ Scraping completed! Successfully processed ${currentPage} pages total.`);
+                    hasMorePages = false;
+                    break; // Exit the pagination loop completely
                 }
                 
-            } catch (error) {
-                console.log(`❌ Error on page ${currentPage}:`, error.message);
+            } catch (nextButtonError) {
+                console.log(`❌ Error clicking next button: ${nextButtonError.message}`);
                 hasMorePages = false;
+                continue;
+            } finally {
+                // Clean up listing browser after pagination check
+                try {
+                    if (listingPage) await listingPage.close();
+                    if (listingBrowser) await listingBrowser.close();
+                    console.log(`🧹 Cleaned up listing browser after pagination check`);
+                } catch (cleanupError) {
+                    console.warn(`⚠️ Cleanup warning for listing browser:`, cleanupError.message);
+                }
             }
         }
         
