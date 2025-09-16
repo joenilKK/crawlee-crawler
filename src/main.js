@@ -11,8 +11,6 @@ const proxyConfiguration = await Actor.createProxyConfiguration({
   countryCode: 'SG',
 });
 
-// Session pool will be created automatically by PlaywrightCrawler
-
 const crawler = new PlaywrightCrawler({
   // Apify proxy configuration
   proxyConfiguration,
@@ -28,45 +26,10 @@ const crawler = new PlaywrightCrawler({
   requestHandlerTimeoutSecs: 60,
   maxRequestRetries: 3,
   
-  // Session rotation configuration
-  useSessionPool: true,
-  sessionPoolOptions: {
-    maxPoolSize: 10,
-    sessionOptions: {
-      maxAgeSecs: 300, // 5 minutes
-      maxUsageCount: 50,
-    },
-  },
-  
-  // Additional anti-detection measures
-  preNavigationHooks: [
-    async ({ page, request, session }) => {
-      // Set random user agent for each session
-      const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
-      ];
-      
-      const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
-      await page.setUserAgent(randomUserAgent);
-      
-      // Add random delay between requests
-      const delay = Math.random() * 2000 + 1000; // 1-3 seconds
-      await page.waitForTimeout(delay);
-      
-      // Set viewport size
-      await page.setViewportSize({ width: 1920, height: 1080 });
-    }
-  ],
-  
-  requestHandler: async ({ page, request, enqueueLinks, session }) => {
-    try {
-      console.log(`Processing: ${request.url} with session: ${session?.id || 'no-session'}`);
-      
-      if (request.label === 'DETAIL') {
+  requestHandler: async ({ page, request, enqueueLinks }) => {
+
+    console.log(`Processing: ${request.url}`);
+    if (request.label === 'DETAIL') {
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
 
       const title = await page.locator('#Overview > .card-body h1').textContent();
@@ -135,17 +98,6 @@ const crawler = new PlaywrightCrawler({
           label: 'CATEGORY', // <= note the same label
         });
       }
-      }
-    } catch (error) {
-      console.error(`Error processing ${request.url}:`, error);
-      
-      // Mark session as bad if there's a critical error
-      if (session && (error.message.includes('blocked') || error.message.includes('captcha') || error.message.includes('403'))) {
-        session.markBad();
-        console.log(`Marked session ${session.id} as bad due to error: ${error.message}`);
-      }
-      
-      throw error; // Re-throw to let Crawlee handle retries
     }
   },
 
@@ -166,7 +118,6 @@ try {
   console.error('Crawling failed:', error);
   await Actor.fail(error);
 } finally {
-  // Session pool cleanup is handled automatically by PlaywrightCrawler
   await Actor.exit();
 }
 
