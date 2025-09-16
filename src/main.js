@@ -32,31 +32,21 @@ const crawler = new PlaywrightCrawler({
     if (request.label === 'DETAIL') {
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
 
-      const title = await page.locator('.doctor-profile h1').textContent();
-      const speciality = await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(1) .doctor-profile__item-detail span').textContent();
-      const languageElements = await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(2) .doctor-profile__item-detail span');
-      const languageCount = await languageElements.count();
-      const language = [];
-      for (let i = 0; i < languageCount; i++) {
-        const lang = await languageElements.nth(i).textContent();
-        if (lang) language.push(lang.trim());
-      }
+      const title = await page.locator('#Overview > .card-body h1').textContent();
+      // Extract UEN and Company Name from the corporate profile section
+      const uen = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("UEN") + span').textContent();
+      const companyName = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("Company Name") + span').textContent();
 
-      const telnumber = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info:nth-child(1) a').textContent();
-      const faxnumber = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info:nth-child(2) span:nth-child(2)').textContent();
-      const email = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info a.clinic-item__email').textContent();
-      const address = await page.locator('.clinic-item .clinic-item__con:nth-child(2) .clinic-item__info:nth-child(1) span:nth-child(2)').textContent();
       
       const results = {
         url: request.url,
         title,
-        speciality,
-        telnumber,
-        faxnumber,
-        email,
-        address,
-        language,
-
+      "company overview": [
+        {
+          "UEN": uen,
+          "Company Name": companyName
+        }
+      ]
       };
 
 
@@ -67,9 +57,9 @@ const crawler = new PlaywrightCrawler({
       // We are now on a category page. We can use this to paginate through and enqueue all products,
       // as well as any subsequent pages we find
 
-      await page.waitForSelector('.list-doctor .list-doctor__view a.btn-fph');
+      await page.waitForSelector('body > .container > .row > .col-12.col-md-6 > .card > .list-group > a');
       await enqueueLinks({
-        selector: '.list-doctor .list-doctor__view a.btn-fph',
+        selector: 'body > .container > .row > .col-12.col-md-6 > .card > .list-group > a',
         label: 'DETAIL', // <= note the different label
       });
 
