@@ -37,9 +37,12 @@ const crawler = new PlaywrightCrawler({
         title = await page.locator('.doctor-profile h1').textContent();
       }
 
-      let speciality = null;
-      if (await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(1) .doctor-profile__item-detail span').count() > 0) {
-        speciality = await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(1) .doctor-profile__item-detail span').textContent();
+      let speciality = [];
+      const specialityElements = await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(1) .doctor-profile__item-detail span');
+      const specialityCount = await specialityElements.count();
+      for (let i = 0; i < specialityCount; i++) {
+        const spec = await specialityElements.nth(i).textContent();
+        if (spec) speciality.push(spec.trim());
       }
 
       let language = [];
