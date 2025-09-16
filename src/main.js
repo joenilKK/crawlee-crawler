@@ -32,19 +32,39 @@ const crawler = new PlaywrightCrawler({
     if (request.label === 'DETAIL') {
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
 
-      const title = await page.locator('.doctor-profile h1').textContent();
-      const speciality = await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(1) .doctor-profile__item-detail span').textContent();
-      const languageElements = await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(2) .doctor-profile__item-detail span');
-      const languageCount = await languageElements.count();
-      const language = [];
-      for (let i = 0; i < languageCount; i++) {
-        const lang = await languageElements.nth(i).textContent();
-        if (lang) language.push(lang.trim());
+      let title = null;
+      if (await page.locator('.doctor-profile h1').count() > 0) {
+        title = await page.locator('.doctor-profile h1').textContent();
       }
 
-      const telnumber = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info:nth-child(1) a').textContent();
-      const email = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info a.clinic-item__email').textContent();
-      const address = await page.locator('.clinic-item .clinic-item__con:nth-child(2) .clinic-item__info:nth-child(1) span:nth-child(2)').textContent();
+      let speciality = null;
+      if (await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(1) .doctor-profile__item-detail span').count() > 0) {
+        speciality = await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(1) .doctor-profile__item-detail span').textContent();
+      }
+
+      let language = [];
+      if (await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(2) .doctor-profile__item-detail span').count() > 0) {
+        const languageElements = await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(2) .doctor-profile__item-detail span');
+        const languageCount = await languageElements.count();
+        for (let i = 0; i < languageCount; i++) {
+          const lang = await languageElements.nth(i).textContent();
+          if (lang) language.push(lang.trim());
+        }
+      }
+
+      let telnumber = null;
+      let email = null;
+      let address = null;
+
+      if (await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info:nth-child(1) a').isVisible()) {
+        telnumber = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info:nth-child(1) a').textContent();
+      }
+      if (await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info a.clinic-item__email').isVisible()) {
+        email = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info a.clinic-item__email').textContent();
+      }
+      if (await page.locator('.clinic-item .clinic-item__con:nth-child(2) .clinic-item__info:nth-child(1) span:nth-child(2)').isVisible()) {
+        address = await page.locator('.clinic-item .clinic-item__con:nth-child(2) .clinic-item__info:nth-child(1) span:nth-child(2)').textContent();
+      }
       
       const results = {
         url: request.url,
@@ -70,14 +90,54 @@ const crawler = new PlaywrightCrawler({
         label: 'DETAIL', // <= note the different label
       });
 
-      // Now we need to find the "Next" button and enqueue the next page of results (if it exists)
-      const nextButton = await page.$('.pagination-next #nextBtn');
-      if (nextButton) {
-        await enqueueLinks({
-          selector: '.pagination-next #nextBtn',
-          label: 'CATEGORY', // <= note the same label
-        });
+      // Handle AJAX pagination by clicking next button until disabled
+      let pageCount = 1;
+      let hasNextPage = true;
+      
+      while (hasNextPage) {
+        const nextButton = await page.$('.pagination .pagination-next a#nextBtn');
+        
+        if (nextButton) {
+          // Check if button is disabled
+          const isDisabled = await nextButton.evaluate(el => el.classList.contains('disabled') || el.getAttribute('disabled') !== null);
+          
+          if (isDisabled) {
+            console.log('Next button is disabled, pagination complete');
+            hasNextPage = false;
+            break;
+          }
+          
+          console.log(`Clicking next button for page ${pageCount + 1}...`);
+          
+          // Click the next button
+          await nextButton.click();
+          
+          // Wait for the processing class to be added to body
+          await page.waitForSelector('body.processing', { timeout: 5000 }).catch(() => {
+            console.log('Processing class not found, continuing...');
+          });
+          
+          // Wait for the processing class to be removed from body (content loaded)
+          await page.waitForFunction(() => {
+            return !document.body.classList.contains('processing');
+          }, { timeout: 10000 });
+          
+          console.log(`Page ${pageCount + 1} content loaded, enqueueing doctor profiles...`);
+          
+          // Enqueue only doctor profile links from the updated content
+          await enqueueLinks({
+            selector: '.list-doctor .list-doctor__view a.btn-fph',
+            label: 'DETAIL',
+          });
+          
+          pageCount++;
+        } else {
+          console.log('No next button found, pagination complete');
+          hasNextPage = false;
+        }
       }
+      
+      console.log(`Pagination completed. Processed ${pageCount} pages.`);
     }
   },
 
