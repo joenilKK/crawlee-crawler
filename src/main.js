@@ -36,17 +36,43 @@ const crawler = new PlaywrightCrawler({
       // Extract UEN and Company Name from the corporate profile section
       const uen = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("UEN") + span').textContent();
       const companyName = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("Company Name") + span').textContent();
+      const dateIncorporation = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("Date Incorporation") + span').textContent();
+      const status = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("Operating Status") + span').textContent();
+      const registrationType = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("Registration Type") + span').textContent();
 
-      
+      let formerNamesList = [];
+      const formerNamesLocator = page.locator('#Company-Name-History span[data-info="formerlyKnownAs"]');
+      const hasFormerNames = await formerNamesLocator.count() > 0;
+      if (hasFormerNames) {
+        const formerNames = await formerNamesLocator.allTextContents();
+        for (const name of formerNames) {
+          if (name && name.trim()) {
+            formerNamesList.push(name.trim());
+          }
+        }
+      } else {
+        formerNamesList = null; // or [] if you prefer empty array
+      }
+
+      const address = await page.locator('#Contact-Information > .card-body > .list-group label:text("Registered Address") + span > span').textContent();
+      const industry = await page.locator('#Company-Industry > .card-body > .list-group label:text("Principal Activity SSIC Code") + span').textContent();
+      const principalssic = await page.locator('#Company-Industry > .card-body > .list-group label:text("Principal Activity") + span a').textContent();
       const results = {
         url: request.url,
         title,
-      "company overview": [
-        {
-          "UEN": uen,
-          "Company Name": companyName
+        "Company Overview": {
+            address: address,
+            "UEN": uen,
+            "Company Name": companyName,
+            "Date Incorporation": dateIncorporation,
+            "Operating Status": status,
+            "Registration Type": registrationType,
+            "Former Names": formerNamesList
+        },
+        "Company Industry (SSIC)": {
+            "Principal Activity SSIC Code": industry,
+            "Principal Activity": principalssic
         }
-      ]
       };
 
 
