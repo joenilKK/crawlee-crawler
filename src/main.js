@@ -101,7 +101,7 @@ const crawler = new PlaywrightCrawler({
   },
 
   // Let's limit our crawls to make our tests shorter and safer.
-  maxRequestsPerCrawl: 5,
+  //maxRequestsPerCrawl: 5,
 });
 
 try {
