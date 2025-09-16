@@ -1,5 +1,5 @@
 
-import { PlaywrightCrawler, Dataset, SessionPool } from 'crawlee';
+import { PlaywrightCrawler, Dataset } from 'crawlee';
 import { Actor } from 'apify';
 
 // Initialize the Actor first
@@ -11,21 +11,11 @@ const proxyConfiguration = await Actor.createProxyConfiguration({
   countryCode: 'SG',
 });
 
-// Create session pool for session rotation
-const sessionPool = new SessionPool({
-  maxPoolSize: 10,
-  sessionOptions: {
-    maxAgeSecs: 300, // 5 minutes
-    maxUsageCount: 50,
-  },
-});
+// Session pool will be created automatically by PlaywrightCrawler
 
 const crawler = new PlaywrightCrawler({
   // Apify proxy configuration
   proxyConfiguration,
-  
-  // Session pool for rotation
-  sessionPool,
   
   // Browser configuration for Apify
   launchContext: {
@@ -131,17 +121,17 @@ const crawler = new PlaywrightCrawler({
       // We are now on a category page. We can use this to paginate through and enqueue all products,
       // as well as any subsequent pages we find
 
-      await page.waitForSelector('body > .container > .row > .col-12.col-md-6 > .card > .list-group > a');
+      await page.waitForSelector('body > .container > .row > .col-12 > .card > .list-group > a');
       await enqueueLinks({
-        selector: 'body > .container > .row > .col-12.col-md-6 > .card > .list-group > a',
+        selector: 'body > .container > .row > .col-12 > .card > .list-group > a',
         label: 'DETAIL', // <= note the different label
       });
 
       // Now we need to find the "Next" button and enqueue the next page of results (if it exists)
-      const nextButton = await page.$('body > .container > .row > .col-12.col-md-6 > nav .pagination .page-item a.page-link[title="next"]');
+      const nextButton = await page.$('body > .container > .row > .col-12 > nav .pagination .page-item a.page-link[title="next"]');
       if (nextButton) {
         await enqueueLinks({
-          selector: 'body > .container > .row > .col-12.col-md-6 > nav .pagination .page-item a.page-link[title="next"]',
+          selector: 'body > .container > .row > .col-12 > nav .pagination .page-item a.page-link[title="next"]',
           label: 'CATEGORY', // <= note the same label
         });
       }
@@ -165,7 +155,7 @@ const crawler = new PlaywrightCrawler({
 
 try {
   // Run the crawler
-  await crawler.run(['https://www.sgpbusiness.com/activities/industrial-classification/Health-And-Social-Services/Health-Services/Medical-And-Dental-Practice-Activities/Medical-And-Dental-Practice-Activities/Clinics-And-Other-General-Medical-Services-Western']);
+  await crawler.run(['https://www.sgpbusiness.com/activities/industrial-classification/Health-And-Social-Services/Health-Services/Medical-And-Dental-Practice-Activities/Medical-And-Dental-Practice-Activities/Clinics-And-Other-General-Medical-Services-Western/principal/1']);
   
   // Get the dataset info
   const dataset = await Dataset.open();
@@ -176,11 +166,7 @@ try {
   console.error('Crawling failed:', error);
   await Actor.fail(error);
 } finally {
-  // Clean up session pool
-  if (sessionPool) {
-    await sessionPool.teardown();
-    console.log('Session pool cleaned up');
-  }
+  // Session pool cleanup is handled automatically by PlaywrightCrawler
   await Actor.exit();
 }
 
