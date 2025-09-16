@@ -32,7 +32,6 @@ const crawler = new PlaywrightCrawler({
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
 
       const title = await page.locator('.panel-heading h1').textContent();
-      const table_head = await page.locator('#overview .panel-heading h2').textContent();
 
       // Get all rows in the #overview table tbody
       const rows = await page.locator('#overview table tbody tr');
@@ -48,11 +47,26 @@ const crawler = new PlaywrightCrawler({
         }
       }
 
+      const table_location = await page.locator('#location .panel-body > .col-xs-12.col-sm-6:nth-child(2) table tbody tr');
+      const table_location_data = [];
+      const table_location_row_count = await table_location.count();
+      for (let i = 0; i < table_location_row_count; i++) {
+        const table_location_row = table_location.nth(i);
+        const table_location_tds = table_location_row.locator('td');
+        const table_location_key = (await table_location_tds.nth(0).textContent())?.trim();
+        const table_location_value = (await table_location_tds.nth(1).textContent())?.trim();
+        if (table_location_key && table_location_value) {
+          table_location_data.push({ title: table_location_key, content: table_location_value });
+        }
+      }
+
+
+
       const results = {
         url: request.url,
         title,
-        table_head,
-        tableData
+        "Business overview": tableData,
+        "Location": table_location_data
       };
 
       // Save each URL as a separate object to the dataset
