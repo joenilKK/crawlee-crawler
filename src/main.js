@@ -8,7 +8,7 @@ await Actor.init();
 // Create proxy configuration
 const proxyConfiguration = await Actor.createProxyConfiguration({
   groups: ['RESIDENTIAL'],
-  countryCode: 'US',
+  countryCode: 'SG',
 });
 
 const crawler = new PlaywrightCrawler({
@@ -43,7 +43,6 @@ const crawler = new PlaywrightCrawler({
       }
 
       const telnumber = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info:nth-child(1) a').textContent();
-      const faxnumber = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info:nth-child(2) span:nth-child(2)').textContent();
       const email = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info a.clinic-item__email').textContent();
       const address = await page.locator('.clinic-item .clinic-item__con:nth-child(2) .clinic-item__info:nth-child(1) span:nth-child(2)').textContent();
       
@@ -52,11 +51,9 @@ const crawler = new PlaywrightCrawler({
         title,
         speciality,
         telnumber,
-        faxnumber,
         email,
         address,
         language,
-
       };
 
 
