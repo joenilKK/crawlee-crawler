@@ -1,12 +1,18 @@
 import { PlaywrightCrawler, Dataset } from 'crawlee';
 import { Actor } from 'apify';
 
+// Initialize the Actor first
+await Actor.init();
+
+// Create proxy configuration
+const proxyConfiguration = await Actor.createProxyConfiguration({
+  groups: ['RESIDENTIAL'],
+  countryCode: 'US',
+});
+
 const crawler = new PlaywrightCrawler({
   // Apify proxy configuration
-  proxyConfiguration: new Actor.createProxyConfiguration({
-    groups: ['RESIDENTIAL'],
-    countryCode: 'US',
-  }),
+  proxyConfiguration,
   
   // Browser configuration for Apify
   launchContext: {
@@ -76,9 +82,6 @@ const crawler = new PlaywrightCrawler({
   // Let's limit our crawls to make our tests shorter and safer.
   maxRequestsPerCrawl: 5,
 });
-
-// Initialize the Actor
-await Actor.init();
 
 try {
   // Run the crawler
