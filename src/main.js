@@ -90,7 +90,7 @@ const crawler = new PlaywrightCrawler({
 
 try {
   // Run the crawler
-  await crawler.run(['https://www.sgpbusiness.com/activities/industrial-classification/Health-And-Social-Services/Health-Services/Medical-And-Dental-Practice-Activities/Medical-And-Dental-Practice-Activities/Clinics-And-Other-General-Medical-Services-Western']);
+  await crawler.run(['https://recordowl.com/ssic/clinics-and-other-general-medical-services']);
   
   // Get the dataset info
   const dataset = await Dataset.open();
