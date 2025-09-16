@@ -1,4 +1,5 @@
-import { PlaywrightCrawler, Dataset, Actor } from 'crawlee';
+import { PlaywrightCrawler, Dataset } from 'crawlee';
+import { Actor } from 'apify';
 
 const crawler = new PlaywrightCrawler({
   // Apify proxy configuration
