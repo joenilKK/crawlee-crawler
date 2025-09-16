@@ -32,32 +32,45 @@ const crawler = new PlaywrightCrawler({
     if (request.label === 'DETAIL') {
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
 
-      const title = await page.locator('#Overview > .card-body h1').textContent();
-      // Extract UEN and Company Name from the corporate profile section
-      const uen = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("UEN") + span').textContent();
-      const companyName = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("Company Name") + span').textContent();
-      const dateIncorporation = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("Date Incorporation") + span').textContent();
-      const status = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("Operating Status") + span').textContent();
-      const registrationType = await page.locator('#Corporate-Profile > .card-body > .list-group label:text("Registration Type") + span').textContent();
+      // Helper function to get text content or null if not found
+      const getTextOrNull = async (locator) => {
+        try {
+          const count = await locator.count();
+          if (count === 0) return null;
+          const text = await locator.first().textContent();
+          return text ? text.trim() : null;
+        } catch {
+          return null;
+        }
+      };
 
-      let formerNamesList = [];
+      const title = await getTextOrNull(page.locator('#Overview > .card-body h1'));
+      // Extract UEN and Company Name from the corporate profile section
+      const uen = await getTextOrNull(page.locator('#Corporate-Profile > .card-body > .list-group label:text("UEN") + span'));
+      const companyName = await getTextOrNull(page.locator('#Corporate-Profile > .card-body > .list-group label:text("Company Name") + span'));
+      const dateIncorporation = await getTextOrNull(page.locator('#Corporate-Profile > .card-body > .list-group label:text("Date Incorporation") + span'));
+      const status = await getTextOrNull(page.locator('#Corporate-Profile > .card-body > .list-group label:text("Operating Status") + span'));
+      const registrationType = await getTextOrNull(page.locator('#Corporate-Profile > .card-body > .list-group label:text("Registration Type") + span'));
+
+      let formerNamesList = null;
       const formerNamesLocator = page.locator('#Company-Name-History span[data-info="formerlyKnownAs"]');
       const hasFormerNames = await formerNamesLocator.count() > 0;
       if (hasFormerNames) {
         const formerNames = await formerNamesLocator.allTextContents();
-        for (const name of formerNames) {
-          if (name && name.trim()) {
-            formerNamesList.push(name.trim());
-          }
-        }
-      } else {
-        formerNamesList = null; // or [] if you prefer empty array
+        formerNamesList = formerNames.map(name => name && name.trim()).filter(Boolean);
+        if (formerNamesList.length === 0) formerNamesList = null;
       }
 
-      const addressSpans = await page.locator('#Contact-Information > .card-body > .list-group label:text("Registered Address") + span > span');
-      const address = (await addressSpans.allTextContents()).map(s => s.trim()).filter(Boolean).join(' ');
-      const industry = await page.locator('#Company-Industry > .card-body > .list-group label:text("Principal Activity SSIC Code") + span').textContent();
-      const principalssic = await page.locator('#Company-Industry > .card-body > .list-group label:text("Principal Activity") + span a').textContent();
+      let address = null;
+      const addressSpans = page.locator('#Contact-Information > .card-body > .list-group label:text("Registered Address") + span > span');
+      if (await addressSpans.count() > 0) {
+        address = (await addressSpans.allTextContents()).map(s => s.trim()).filter(Boolean).join(' ');
+        if (!address) address = null;
+      }
+
+      const industry = await getTextOrNull(page.locator('#Company-Industry > .card-body > .list-group label:text("Principal Activity SSIC Code") + span'));
+      const principalssic = await getTextOrNull(page.locator('#Company-Industry > .card-body > .list-group label:text("Principal Activity") + span a'));
+
       const results = {
         url: request.url,
         title,
