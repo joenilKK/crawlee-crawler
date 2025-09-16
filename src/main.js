@@ -54,7 +54,8 @@ const crawler = new PlaywrightCrawler({
         formerNamesList = null; // or [] if you prefer empty array
       }
 
-      const address = await page.locator('#Contact-Information > .card-body > .list-group label:text("Registered Address") + span > span').textContent();
+      const addressSpans = await page.locator('#Contact-Information > .card-body > .list-group label:text("Registered Address") + span > span');
+      const address = (await addressSpans.allTextContents()).map(s => s.trim()).filter(Boolean).join(' ');
       const industry = await page.locator('#Company-Industry > .card-body > .list-group label:text("Principal Activity SSIC Code") + span').textContent();
       const principalssic = await page.locator('#Company-Industry > .card-body > .list-group label:text("Principal Activity") + span a').textContent();
       const results = {
