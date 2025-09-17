@@ -170,7 +170,7 @@ const crawler = new PlaywrightCrawler({
       let companyAge = null;
       try {
         // First try to get the first match
-        const companyAgeElements = page.locator('.bg-white shadow .py-4 dt:has-text("Company Age") + dd');
+        const companyAgeElements = page.locator('.bg-white.shadow .py-4 dt:has-text("Company Age") + dd');
         const count = await companyAgeElements.count();
         if (count > 0) {
           companyAge = await companyAgeElements.first().textContent();
