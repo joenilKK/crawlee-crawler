@@ -94,7 +94,7 @@ const crawler = new PlaywrightCrawler({
       const title = await page.locator('h1.text-xl').textContent();
       const specialist = await page.locator('span[itemprop="industry"]').textContent();
       const registrationNumber = await page.locator('h3:has-text("General Information") + p.mt-1').textContent();
-      const address = await page.locator('h3:has-text("Registered Address") + span a').textContent();
+      const address = await page.locator('dt:has-text("Registered Address") + span a').textContent();
       const status = await page.locator('dt:has-text("Operating Status") + dd.mt-1').textContent();
       const companyAge = await page.locator('dt:has-text("Company Age") + dd.mt-1').textContent();
 
