@@ -167,7 +167,7 @@ const crawler = new PlaywrightCrawler({
         companyWebsite = null;
       }
 
-      const companyAge = await page.locator('div.block#overview dt:has-text("Company Age") + dd').textContent();
+      const companyAge = await getTextOrNull(page.locator('div#overview dt:has-text("Company Age") + dd'));
     
 
       const primaryssic = await getTextOrNull(page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a'));
