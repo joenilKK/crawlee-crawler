@@ -1,23 +1,30 @@
 
 import { PlaywrightCrawler, Dataset } from 'crawlee';
 import { Actor } from 'apify';
-import fs from 'fs';
-import path from 'path';
-
-// Load cookies from JSON file
-const loadCookies = () => {
-  try {
-    const cookiePath = path.join(process.cwd(), 'src', 'recordowl-cookies.json');
-    const cookieData = fs.readFileSync(cookiePath, 'utf8');
-    return JSON.parse(cookieData);
-  } catch (error) {
-    console.error('Failed to load cookies:', error);
-    return [];
-  }
-};
 
 // Initialize the Actor first
 await Actor.init();
+
+// Get input configuration
+const input = await Actor.getInput();
+
+// Load cookies from input configuration
+const loadCookies = () => {
+  try {
+    const jsonCookie = input?.jsonCookie;
+    
+    if (!jsonCookie) {
+      console.error('No JSON cookie provided in input configuration');
+      return [];
+    }
+    
+    // Parse the minified JSON cookie data
+    return JSON.parse(jsonCookie);
+  } catch (error) {
+    console.error('Failed to load cookies from input:', error);
+    return [];
+  }
+};
 
 // Create proxy configuration
 const proxyConfiguration = await Actor.createProxyConfiguration({

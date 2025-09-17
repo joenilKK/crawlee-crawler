@@ -1,56 +1,16 @@
 {
-  "title": "Farrer Park Hospital Crawler",
-  "description": "Web crawler for extracting specialist doctor information from Farrer Park Hospital website. Crawls all pages automatically.",
+  "title": "RecordOwl Crawler",
+  "description": "Web crawler for extracting business information from RecordOwl website. Requires JSON cookie data for authentication.",
   "type": "object",
   "schemaVersion": 1,
   "properties": {
-    "headless": {
-      "title": "🖥️ Headless Mode",
-      "type": "boolean",
-      "description": "Run browser in headless mode. Set to false for debugging, true for production.",
-      "default": true,
-      "prefill": true
-    },
-    "outputFilename": {
-      "title": "📁 Output Filename (Optional)",
+    "jsonCookie": {
+      "title": "🍪 JSON Cookie",
       "type": "string",
-      "description": "Custom filename for the output JSON file (without .json extension). If not provided, will use default naming.",
+      "description": "Minified JSON cookie data for authentication. Paste the cookie data directly here.",
       "editor": "textfield",
-      "prefill": "mtalvernia-scraped-data"
-    },
-    "proxyConfiguration": {
-      "title": "🌐 Proxy Configuration",
-      "type": "object",
-      "description": "Configure proxy settings for the crawler",
-      "editor": "proxy"
-    },
-    "maxRotationPerSession": {
-      "title": "🔄 Max Rotation Per Session",
-      "type": "integer",
-      "description": "Maximum number of proxy rotations allowed per session",
-      "minimum": 1,
-      "maximum": 100,
-      "default": 10,
-      "editor": "number"
-    },
-    "maxRetries": {
-      "title": "🔄 Max Retries for Server/Network Errors",
-      "type": "integer",
-      "description": "Maximum number of retries for server or network errors",
-      "minimum": 0,
-      "maximum": 20,
-      "default": 3,
-      "editor": "number"
-    },
-    "maxRequestTimeout": {
-      "title": "⏱️ Max Request Timeout (seconds)",
-      "type": "integer",
-      "description": "Maximum timeout for individual requests in seconds",
-      "minimum": 5,
-      "maximum": 300,
-      "default": 30,
-      "editor": "number"
+      "prefill": ""
     }
   },
-  "required": []
+  "required": ["jsonCookie"]
 }
