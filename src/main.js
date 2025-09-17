@@ -119,7 +119,28 @@ const crawler = new PlaywrightCrawler({
       const registrationNumber = await getTextOrNull(page.locator('h3:has-text("General Information") + p.mt-1'));
       const address = await getTextOrNull(page.locator('dt:has-text("Registered Address") + dd.mt-1 a'));
       const status = await getTextOrNull(page.locator('dt:has-text("Operating Status") + dd.mt-1'));
-      const companyAge = await page.locator('dt:has-text("Company Age") + dd').textContent();
+      // Try to get company age with more specific selector
+      let companyAge = null;
+      try {
+        // First try to get the first match
+        const companyAgeElements = page.locator('dt:has-text("Company Age") + dd');
+        const count = await companyAgeElements.count();
+        if (count > 0) {
+          companyAge = await companyAgeElements.first().textContent();
+          companyAge = companyAge ? companyAge.trim() : null;
+        }
+      } catch (error) {
+        console.log('Error getting company age:', error.message);
+        // Fallback: try to find by looking for dd elements that contain time-related text
+        const allDds = await page.locator('dd').all();
+        for (const dd of allDds) {
+          const text = await dd.textContent();
+          if (text && (text.includes('days') || text.includes('years') || text.includes('months'))) {
+            companyAge = text.trim();
+            break;
+          }
+        }
+      }
 
       const primaryssic = await getTextOrNull(page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a'));
       const primaryIndustry = await getTextOrNull(page.locator('dt:has-text("Primary Industry") + dd.mt-1 a'));
