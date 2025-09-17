@@ -119,7 +119,17 @@ const crawler = new PlaywrightCrawler({
       const registrationNumber = await getTextOrNull(page.locator('h3:has-text("General Information") + p.mt-1'));
       const address = await getTextOrNull(page.locator('dt:has-text("Registered Address") + dd.mt-1 a'));
       const status = await getTextOrNull(page.locator('dt:has-text("Operating Status") + dd.mt-1'));
-      const companyAge = await getTextOrNull(page.locator('dt:has-text("Company Age") + dd'));
+      // Debug: Check what we're finding for company age
+      const companyAgeElement = page.locator('dt:has-text("Company Age") + dd');
+      const companyAgeExists = await companyAgeElement.count() > 0;
+      console.log('Company Age element found:', companyAgeExists);
+      
+      if (companyAgeExists) {
+        const rawText = await companyAgeElement.textContent();
+        console.log('Raw company age text:', JSON.stringify(rawText));
+      }
+      
+      const companyAge = await getTextOrNull(companyAgeElement);
 
       const primaryssic = await getTextOrNull(page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a'));
       const primaryIndustry = await getTextOrNull(page.locator('dt:has-text("Primary Industry") + dd.mt-1 a'));
