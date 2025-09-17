@@ -68,9 +68,9 @@ const crawler = new PlaywrightCrawler({
             expires: cookie.expirationDate ? Math.floor(cookie.expirationDate) : undefined,
             httpOnly: cookie.httpOnly,
             secure: cookie.secure,
-            sameSite: cookie.sameSite === 'no_restriction' ? 'none' : 
-                     cookie.sameSite === 'lax' ? 'lax' : 
-                     cookie.sameSite === 'strict' ? 'strict' : 'none'
+            sameSite: cookie.sameSite === 'no_restriction' ? 'None' : 
+                     cookie.sameSite === 'lax' ? 'Lax' : 
+                     cookie.sameSite === 'strict' ? 'Strict' : 'None'
           }));
           
           // Set cookies before navigating
