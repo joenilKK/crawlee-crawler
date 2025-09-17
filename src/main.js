@@ -126,10 +126,10 @@ const crawler = new PlaywrightCrawler({
       const registrationNumber = await getTextOrNull(page.locator('h3:has-text("General Information") + p.mt-1'));
       const address = await getTextOrNull(page.locator('dt:has-text("Registered Address") + dd.mt-1 a'));
       const status = await getTextOrNull(page.locator('dt:has-text("Operating Status") + dd.mt-1'));
-      //const buildingName = await getTextOrNull(page.locator('dt:has-text("Building") + dd.mt-1'));
-      //const contactNumberString = await getTextOrNull(page.locator('dt:has-text("Contact Number") + dd.mt-1'));
-      //const companyEmail = await getTextOrNull(page.locator('dt:has-text("Email") + dd.mt-1 a'));
-      //const companyWebsite = await getTextOrNull(page.locator('dt:has-text("Website") + dd.mt-1 a'));
+      const buildingName = await getTextOrNull(page.locator('div#overview dt:has-text("Building") + dd.mt-1'));
+      const contactNumberString = await getTextOrNull(page.locator('div#overview dt:has-text("Contact Number") + dd.mt-1'));
+      const companyEmail = await getTextOrNull(page.locator('div#overview dt:has-text("Email") + dd.mt-1 a'));
+      const companyWebsite = await getTextOrNull(page.locator('div#overview dt:has-text("Website") + dd.mt-1 a'));
       const companyAge = await getTextOrNull(page.locator('div#overview dt:has-text("Company Age") + dd'));
     
 
@@ -147,10 +147,10 @@ const crawler = new PlaywrightCrawler({
           "Address": address,
           "Status": status,
           "Company Age": companyAge,
-          // "Building Name": buildingName,
-          // "Contact Number": contactNumberString,
-          // "Company Email": companyEmail,
-          // "Company Website": companyWebsite
+          "Building Name": buildingName,
+          "Contact Number": contactNumberString,
+          "Company Email": companyEmail,
+          "Company Website": companyWebsite
         },
         "Industry Classification" : {
           "Primary SSIC Code": primaryssic,
