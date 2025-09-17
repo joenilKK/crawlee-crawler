@@ -47,7 +47,7 @@ const crawler = new PlaywrightCrawler({
   },
   
   // Request configuration
-  requestHandlerTimeoutSecs: 60,
+  requestHandlerTimeoutSecs: 120,
   maxRequestRetries: 3,
   
   // Enable session management to maintain cookies
@@ -122,16 +122,14 @@ const crawler = new PlaywrightCrawler({
         }
       };
 
-      const specialist = await getTextOrNull(page.locator('span[itemprop="industry"]'));
       const registrationNumber = await getTextOrNull(page.locator('h3:has-text("General Information") + p.mt-1'));
       const address = await getTextOrNull(page.locator('dt:has-text("Registered Address") + dd.mt-1 a'));
       const status = await getTextOrNull(page.locator('dt:has-text("Operating Status") + dd.mt-1'));
+      const companyAge = await getTextOrNull(page.locator('div#overview dt:has-text("Company Age") + dd'));
       const buildingName = await getTextOrNull(page.locator('div#overview dt:has-text("Building") + dd.mt-1'));
       const contactNumberString = await getTextOrNull(page.locator('div#overview dt:has-text("Contact Number") + dd.mt-1'));
       const companyEmail = await getTextOrNull(page.locator('div#overview dt:has-text("Email") + dd.mt-1 a'));
       const companyWebsite = await getTextOrNull(page.locator('div#overview dt:has-text("Website") + dd.mt-1 a'));
-      const companyAge = await getTextOrNull(page.locator('div#overview dt:has-text("Company Age") + dd'));
-    
 
       const primaryssic = await getTextOrNull(page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a'));
       const primaryIndustry = await getTextOrNull(page.locator('dt:has-text("Primary Industry") + dd.mt-1 a'));
