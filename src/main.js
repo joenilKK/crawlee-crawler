@@ -92,16 +92,29 @@ const crawler = new PlaywrightCrawler({
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
 
       const title = await page.locator('h1.text-xl').textContent();
-      const specialist = await page.locator('span[itemprop="industry"]').textContent();
-      const registrationNumber = await page.locator('h3:has-text("General Information") + p.mt-1').textContent();
-      const address = await page.locator('dt:has-text("Registered Address") + span a').textContent();
-      const status = await page.locator('dt:has-text("Operating Status") + dd.mt-1').textContent();
-      const companyAge = await page.locator('dt:has-text("Company Age") + dd.mt-1').textContent();
+      // Helper to get text or null if not found
+      const getTextOrNull = async (locator) => {
+        try {
+          const el = await locator.elementHandle();
+          if (!el) return null;
+          const text = await locator.textContent();
+          return text ? text.trim() : null;
+        } catch {
+          return null;
+        }
+      };
 
-      const primaryssic = await page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a').textContent();
-      const primaryIndustry = await page.locator('dt:has-text("Primary Industry") + dd.mt-1 a').textContent();
-      const secondaryssic = await page.locator('dt:has-text("Secondary SSIC Code") + dd.mt-1 a').textContent();
-      const secondaryIndustry = await page.locator('dt:has-text("Secondary Industry") + dd.mt-1 a').textContent();
+      const specialist = await getTextOrNull(page.locator('span[itemprop="industry"]'));
+      const registrationNumber = await getTextOrNull(page.locator('h3:has-text("General Information") + p.mt-1'));
+      const address = await getTextOrNull(page.locator('dt:has-text("Registered Address") + dd.mt-1 a'));
+      const status = await getTextOrNull(page.locator('dt:has-text("Operating Status") + dd.mt-1'));
+      const companyAge = await getTextOrNull(page.locator('dt:has-text("Company Age") + dd.mt-1'));
+
+      const primaryssic = await getTextOrNull(page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a'));
+      const primaryIndustry = await getTextOrNull(page.locator('dt:has-text("Primary Industry") + dd.mt-1 a'));
+      const secondaryssic = await getTextOrNull(page.locator('dt:has-text("Secondary SSIC Code") + dd.mt-1 a'));
+      const secondaryIndustry = await getTextOrNull(page.locator('dt:has-text("Secondary Industry") + dd.mt-1 a'));
+
       const results = {
         url: request.url,
         title,
