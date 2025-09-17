@@ -163,8 +163,12 @@ const crawler = new PlaywrightCrawler({
       
       for (const link of detailLinks) {
         const href = await link.getAttribute('href');
-        if (href && !processedUrls.has(href)) {
-          newDetailUrls.push(href);
+        if (href) {
+          // Convert relative URLs to absolute URLs
+          const absoluteUrl = href.startsWith('http') ? href : new URL(href, request.url).href;
+          if (!processedUrls.has(absoluteUrl)) {
+            newDetailUrls.push(absoluteUrl);
+          }
         }
       }
       
@@ -179,9 +183,13 @@ const crawler = new PlaywrightCrawler({
       const nextButton = await page.$('.isolate a.px-4:has-text("Next")');
       if (nextButton) {
         const nextHref = await nextButton.getAttribute('href');
-        if (nextHref && !processedUrls.has(nextHref)) {
-          await crawler.addRequests([{ url: nextHref, label: 'CATEGORY' }]);
-          log.info(`Enqueued next page: ${nextHref}`);
+        if (nextHref) {
+          // Convert relative URL to absolute URL
+          const absoluteNextUrl = nextHref.startsWith('http') ? nextHref : new URL(nextHref, request.url).href;
+          if (!processedUrls.has(absoluteNextUrl)) {
+            await crawler.addRequests([{ url: absoluteNextUrl, label: 'CATEGORY' }]);
+            log.info(`Enqueued next page: ${absoluteNextUrl}`);
+          }
         }
       }
     }
