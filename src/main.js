@@ -1,11 +1,20 @@
 
 import { PlaywrightCrawler, Dataset } from 'crawlee';
 import { Actor } from 'apify';
+import fs from 'fs';
+import path from 'path';
 
-// Get credentials from environment variables or use defaults
-const USERNAME = process.env.CRAWLER_USERNAME || 'growthsge@gmail.com';
-const PASSWORD = process.env.CRAWLER_PASSWORD || 'sustainablegrowthexpert';
-const LOGIN_URL = process.env.LOGIN_URL || 'https://recordowl.com/login';
+// Load cookies from JSON file
+const loadCookies = () => {
+  try {
+    const cookiePath = path.join(process.cwd(), 'src', 'recordowl.com_json_1758075767304.json');
+    const cookieData = fs.readFileSync(cookiePath, 'utf8');
+    return JSON.parse(cookieData);
+  } catch (error) {
+    console.error('Failed to load cookies:', error);
+    return [];
+  }
+};
 
 // Initialize the Actor first
 await Actor.init();
@@ -15,9 +24,6 @@ const proxyConfiguration = await Actor.createProxyConfiguration({
   groups: ['RESIDENTIAL'],
   countryCode: 'SG',
 });
-
-// Track if login has been performed
-let isLoggedIn = false;
 
 const crawler = new PlaywrightCrawler({
   // Apify proxy configuration
@@ -37,120 +43,50 @@ const crawler = new PlaywrightCrawler({
   // Enable session management to maintain cookies
   useSessionPool: true,
   sessionPoolOptions: {
-    maxPoolSize: 1, // Use single session to maintain login state
+    maxPoolSize: 1, // Use single session to maintain state
     sessionOptions: {
       maxAgeSecs: 3600, // 1 hour session
       maxUsageCount: 100, // Allow many requests per session
     },
   },
   
-  // Pre-navigation hook to handle authentication
+  // Pre-navigation hook to set cookies
   preNavigationHooks: [
-    async ({ page, request, log, session }) => {
-      // Check if we need to login (only once per session)
-      if (!isLoggedIn && request.label === 'LOGIN') {
-        log.info('Performing Google OAuth login...');
+    async ({ page, request, log }) => {
+      // Load and set cookies for the first request
+      if (request.label === 'INITIAL') {
+        log.info('Setting authentication cookies...');
         
-        // Navigate to login page
-        await page.goto(LOGIN_URL);
-        
-        // Wait for Google login button to appear
-        await page.waitForSelector('a[href*="google"], button[data-provider="google"], .google-login, [class*="google"]', { timeout: 15000 });
-        
-        // Click on Google login button
-        await page.click('a[href*="google"], button[data-provider="google"], .google-login, [class*="google"]');
-        
-        // Wait for Google OAuth page to load
-        await page.waitForNavigation({ waitUntil: 'networkidle' });
-        
-        // Check if we're on Google's OAuth page
-        const currentUrl = page.url();
-        log.info(`Current URL after Google button click: ${currentUrl}`);
-        
-        const isGoogleOAuth = currentUrl.includes('accounts.google.com');
-        if (isGoogleOAuth) {
-          log.info('On Google OAuth page, entering credentials...');
+        const cookies = loadCookies();
+        if (cookies.length > 0) {
+          // Convert cookie format for Playwright
+          const playwrightCookies = cookies.map(cookie => ({
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path,
+            expires: cookie.expirationDate ? Math.floor(cookie.expirationDate) : undefined,
+            httpOnly: cookie.httpOnly,
+            secure: cookie.secure,
+            sameSite: cookie.sameSite === 'no_restriction' ? 'none' : 
+                     cookie.sameSite === 'lax' ? 'lax' : 
+                     cookie.sameSite === 'strict' ? 'strict' : 'none'
+          }));
           
-          // Wait for email input field
-          await page.waitForSelector('input[type="email"], input[name="email"]', { timeout: 10000 });
-          
-          // Enter email
-          await page.fill('input[type="email"], input[name="email"]', USERNAME);
-          
-          // Click Next button
-          await page.click('#identifierNext, button[type="submit"]');
-          
-          // Wait for password field
-          await page.waitForSelector('input[type="password"], input[name="password"]', { timeout: 10000 });
-          
-          // Enter password
-          await page.fill('input[type="password"], input[name="password"]', PASSWORD);
-          
-          // Click Next/Sign in button
-          await page.click('#passwordNext, button[type="submit"]');
-          
-          // Wait for OAuth flow to complete and redirect back
-          await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 });
-          
-          const finalUrl = page.url();
-          log.info(`Google OAuth login completed. Final URL: ${finalUrl}`);
-          isLoggedIn = true;
+          // Set cookies before navigating
+          await page.context().addCookies(playwrightCookies);
+          log.info(`Successfully set ${playwrightCookies.length} cookies`);
         } else {
-          // Check if we're already logged in or if it's a different auth flow
-          log.info(`Not on Google OAuth page. Current URL: ${currentUrl}`);
-          
-          // Check if we're already logged in by looking for logout buttons or user profile elements
-          const alreadyLoggedIn = await page.$('a[href*="logout"], .logout, .user-profile, .user-menu') !== null;
-          if (alreadyLoggedIn) {
-            log.info('Already logged in or login completed automatically');
-            isLoggedIn = true;
-          } else {
-            // Fallback to regular form login if Google OAuth button not found
-            log.info('Google OAuth not detected, trying regular form login...');
-            
-            try {
-              await page.waitForSelector('input[name="username"], input[name="email"], input[type="email"]', { timeout: 10000 });
-              await page.fill('input[name="username"], input[name="email"], input[type="email"]', USERNAME);
-              await page.fill('input[name="password"], input[type="password"]', PASSWORD);
-              await page.click('button[type="submit"], input[type="submit"], .login-button, #login-button');
-              await page.waitForNavigation({ waitUntil: 'networkidle' });
-              log.info('Regular form login completed');
-              isLoggedIn = true;
-            } catch (error) {
-              log.warning('Regular form login failed, but continuing with crawl');
-            }
-          }
+          log.warning('No cookies loaded, proceeding without authentication');
         }
-      } else if (isLoggedIn) {
-        log.info('Using existing session - already logged in');
+      } else {
+        log.info('Using existing session with cookies');
       }
     }
   ],
   
   requestHandler: async ({ page, request, enqueueLinks, log }) => {
     console.log(`Processing: ${request.url}`);
-    
-    // Skip login requests in the main handler
-    if (request.label === 'LOGIN') {
-      return;
-    }
-    
-    // Check if we're still logged in before processing
-    if (isLoggedIn) {
-      try {
-        // Quick check to see if we're still logged in by looking for login indicators
-        const isOnLoginPage = page.url().includes('/login');
-        const hasLoginForm = await page.$('input[type="password"], input[name="password"]') !== null;
-        
-        if (isOnLoginPage || hasLoginForm) {
-          log.warning('Detected login page, session may have expired. Re-authenticating...');
-          isLoggedIn = false;
-          // The preNavigationHooks will handle re-login on the next request
-        }
-      } catch (error) {
-        log.warning('Could not verify login status, continuing with request');
-      }
-    }
     
     if (request.label === 'DETAIL') {
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
@@ -191,10 +127,9 @@ const crawler = new PlaywrightCrawler({
 });
 
 try {
-  // Run the crawler with login first
+  // Run the crawler with cookie authentication
   await crawler.run([
-    { url: LOGIN_URL, label: 'LOGIN' },
-    'https://recordowl.com/ssic/clinics-and-other-general-medical-services'
+    { url: 'https://recordowl.com/ssic/clinics-and-other-general-medical-services', label: 'INITIAL' }
   ]);
   
   // Get the dataset info
