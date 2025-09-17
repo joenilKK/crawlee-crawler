@@ -9,7 +9,7 @@ await Actor.init();
 const input = await Actor.getInput();
 
 // Get total pages from input, default to 10 if not provided
-const totalPages = input?.totalPages || 10;
+const totalPages = input?.totalPages || 3;
 
 // Load cookies from input configuration
 const loadCookies = () => {
@@ -129,16 +129,16 @@ const crawler = new PlaywrightCrawler({
       const address = await getTextOrNull(page.locator('dt:has-text("Registered Address") + dd.mt-1 a'));
       const status = await getTextOrNull(page.locator('dt:has-text("Operating Status") + dd.mt-1'));
       const companyAge = await getTextOrNull(page.locator('div#overview dt:has-text("Company Age") + dd'));
-      const companyEmail = await getTextOrNull(page.locator('div#overview dt:has-text("Email") + dd.mt-1 a'));
-      const companyWebsite = await getTextOrNull(page.locator('div#overview dt:has-text("Website") + dd.mt-1 a'));
-      const contactNumberString = await getTextOrNull(page.locator('div#overview dt:has-text("Contact Number") + dd.mt-1'));
-      const buildingName = await getTextOrNull(page.locator('div#overview dt:has-text("Building") + dd.mt-1'));
-      
 
       const primaryssic = await getTextOrNull(page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a'));
       const primaryIndustry = await getTextOrNull(page.locator('dt:has-text("Primary Industry") + dd.mt-1 a'));
       const secondaryssic = await getTextOrNull(page.locator('dt:has-text("Secondary SSIC Code") + dd.mt-1 a'));
       const secondaryIndustry = await getTextOrNull(page.locator('dt:has-text("Secondary Industry") + dd.mt-1 a'));
+
+      const companyEmail = await getTextOrNull(page.locator('div#overview dt:has-text("Email") + dd.mt-1 a'));
+      const companyWebsite = await getTextOrNull(page.locator('div#overview dt:has-text("Website") + dd.mt-1 a'));
+      const contactNumberString = await getTextOrNull(page.locator('div#overview dt:has-text("Contact Number") + dd.mt-1'));
+      const buildingName = await getTextOrNull(page.locator('div#overview dt:has-text("Building") + dd.mt-1'));
 
       const results = {
         url: request.url,
