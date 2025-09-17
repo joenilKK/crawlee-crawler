@@ -16,6 +16,9 @@ const proxyConfiguration = await Actor.createProxyConfiguration({
   countryCode: 'SG',
 });
 
+// Track if login has been performed
+let isLoggedIn = false;
+
 const crawler = new PlaywrightCrawler({
   // Apify proxy configuration
   proxyConfiguration,
@@ -33,12 +36,19 @@ const crawler = new PlaywrightCrawler({
   
   // Enable session management to maintain cookies
   useSessionPool: true,
+  sessionPoolOptions: {
+    maxPoolSize: 1, // Use single session to maintain login state
+    sessionOptions: {
+      maxAgeSecs: 3600, // 1 hour session
+      maxUsageCount: 100, // Allow many requests per session
+    },
+  },
   
   // Pre-navigation hook to handle authentication
   preNavigationHooks: [
-    async ({ page, request, log }) => {
-      // Only perform login on the first request
-      if (request.label === 'LOGIN') {
+    async ({ page, request, log, session }) => {
+      // Check if we need to login (only once per session)
+      if (!isLoggedIn && request.label === 'LOGIN') {
         log.info('Performing Google OAuth login...');
         
         // Navigate to login page
@@ -84,14 +94,16 @@ const crawler = new PlaywrightCrawler({
           
           const finalUrl = page.url();
           log.info(`Google OAuth login completed. Final URL: ${finalUrl}`);
+          isLoggedIn = true;
         } else {
           // Check if we're already logged in or if it's a different auth flow
           log.info(`Not on Google OAuth page. Current URL: ${currentUrl}`);
           
           // Check if we're already logged in by looking for logout buttons or user profile elements
-          const isLoggedIn = await page.$('a[href*="logout"], .logout, .user-profile, .user-menu') !== null;
-          if (isLoggedIn) {
+          const alreadyLoggedIn = await page.$('a[href*="logout"], .logout, .user-profile, .user-menu') !== null;
+          if (alreadyLoggedIn) {
             log.info('Already logged in or login completed automatically');
+            isLoggedIn = true;
           } else {
             // Fallback to regular form login if Google OAuth button not found
             log.info('Google OAuth not detected, trying regular form login...');
@@ -103,18 +115,43 @@ const crawler = new PlaywrightCrawler({
               await page.click('button[type="submit"], input[type="submit"], .login-button, #login-button');
               await page.waitForNavigation({ waitUntil: 'networkidle' });
               log.info('Regular form login completed');
+              isLoggedIn = true;
             } catch (error) {
               log.warning('Regular form login failed, but continuing with crawl');
             }
           }
         }
+      } else if (isLoggedIn) {
+        log.info('Using existing session - already logged in');
       }
     }
   ],
   
-  requestHandler: async ({ page, request, enqueueLinks }) => {
-
+  requestHandler: async ({ page, request, enqueueLinks, log }) => {
     console.log(`Processing: ${request.url}`);
+    
+    // Skip login requests in the main handler
+    if (request.label === 'LOGIN') {
+      return;
+    }
+    
+    // Check if we're still logged in before processing
+    if (isLoggedIn) {
+      try {
+        // Quick check to see if we're still logged in by looking for login indicators
+        const isOnLoginPage = page.url().includes('/login');
+        const hasLoginForm = await page.$('input[type="password"], input[name="password"]') !== null;
+        
+        if (isOnLoginPage || hasLoginForm) {
+          log.warning('Detected login page, session may have expired. Re-authenticating...');
+          isLoggedIn = false;
+          // The preNavigationHooks will handle re-login on the next request
+        }
+      } catch (error) {
+        log.warning('Could not verify login status, continuing with request');
+      }
+    }
+    
     if (request.label === 'DETAIL') {
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
 
