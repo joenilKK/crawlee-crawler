@@ -8,6 +8,9 @@ await Actor.init();
 // Get input configuration
 const input = await Actor.getInput();
 
+// Get total pages from input, default to 10 if not provided
+const totalPages = input?.totalPages || 10;
+
 // Load cookies from input configuration
 const loadCookies = () => {
   try {
@@ -194,19 +197,23 @@ const crawler = new PlaywrightCrawler({
       
       log.info(`Enqueued ${newDetailUrls.length} new detail pages`);
 
-      // Now we need to find the "Next" button and enqueue the next page of results (if it exists)
-      const nextButton = await page.$('.isolate a.px-4:has-text("Next")');
-      if (nextButton) {
-        const nextHref = await nextButton.getAttribute('href');
-        if (nextHref) {
-          // Convert relative URL to absolute URL
-          const absoluteNextUrl = nextHref.startsWith('http') ? nextHref : new URL(nextHref, request.url).href;
-          if (!processedUrls.has(absoluteNextUrl)) {
-            await crawler.addRequests([{ url: absoluteNextUrl, label: 'CATEGORY' }]);
-            log.info(`Enqueued next page: ${absoluteNextUrl}`);
-          }
+      // Generate pagination URLs based on total pages
+      const baseUrl = 'https://recordowl.com/ssic/clinics-and-other-general-medical-services';
+      const newPageUrls = [];
+      
+      for (let page = 2; page <= totalPages; page++) {
+        const pageUrl = `${baseUrl}?page=${page}`;
+        if (!processedUrls.has(pageUrl)) {
+          newPageUrls.push(pageUrl);
         }
       }
+      
+      // Enqueue all pagination URLs
+      for (const url of newPageUrls) {
+        await crawler.addRequests([{ url, label: 'CATEGORY' }]);
+      }
+      
+      log.info(`Enqueued ${newPageUrls.length} pagination pages (pages 2-${totalPages})`);
     }
   },
 
@@ -215,6 +222,8 @@ const crawler = new PlaywrightCrawler({
 });
 
 try {
+  console.log(`Starting crawler with ${totalPages} total pages to process`);
+  
   // Run the crawler with cookie authentication
   await crawler.run([
     { url: 'https://recordowl.com/ssic/clinics-and-other-general-medical-services', label: 'CATEGORY' }
@@ -225,6 +234,7 @@ try {
   const datasetInfo = await dataset.getInfo();
   console.log(`Crawling completed. Dataset contains ${datasetInfo.itemCount} items.`);
   console.log(`Total URLs processed: ${processedUrls.size}`);
+  console.log(`Processed pages 1-${totalPages}`);
   
 } catch (error) {
   console.error('Crawling failed:', error);
