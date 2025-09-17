@@ -25,6 +25,9 @@ const proxyConfiguration = await Actor.createProxyConfiguration({
   countryCode: 'SG',
 });
 
+// Track processed URLs to prevent duplicates
+const processedUrls = new Set();
+
 const crawler = new PlaywrightCrawler({
   // Apify proxy configuration
   proxyConfiguration,
@@ -43,7 +46,7 @@ const crawler = new PlaywrightCrawler({
   // Enable session management to maintain cookies
   useSessionPool: true,
   sessionPoolOptions: {
-    maxPoolSize: 1, // Use single session to maintain state
+    maxPoolSize: 2, // Allow multiple sessions for better concurrency
     sessionOptions: {
       maxAgeSecs: 3600, // 1 hour session
       maxUsageCount: 100, // Allow many requests per session
@@ -53,8 +56,8 @@ const crawler = new PlaywrightCrawler({
   // Pre-navigation hook to set cookies
   preNavigationHooks: [
     async ({ page, request, log }) => {
-      // Load and set cookies for the first request
-      if (request.label === 'INITIAL') {
+      // Load and set cookies for the first request (category page)
+      if (request.url === 'https://recordowl.com/ssic/clinics-and-other-general-medical-services') {
         log.info('Setting authentication cookies...');
         
         const cookies = loadCookies();
@@ -88,7 +91,15 @@ const crawler = new PlaywrightCrawler({
   requestHandler: async ({ page, request, enqueueLinks, log }) => {
     console.log(`Processing: ${request.url}`);
     
+    // Check if URL has already been processed to prevent duplicates
+    if (processedUrls.has(request.url)) {
+      log.info(`Skipping duplicate URL: ${request.url}`);
+      return;
+    }
+    
     if (request.label === 'DETAIL') {
+      // Mark URL as processed
+      processedUrls.add(request.url);
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
 
       const title = await page.locator('h1.text-xl').textContent();
@@ -140,20 +151,38 @@ const crawler = new PlaywrightCrawler({
     } else {
       // We are now on a category page. We can use this to paginate through and enqueue all products,
       // as well as any subsequent pages we find
+      
+      // Mark category page as processed
+      processedUrls.add(request.url);
 
       await page.waitForSelector('main.bg-white > .mx-auto > .mb-8 > .grid:nth-child(2) > .bg-white a.font-semibold');
-      await enqueueLinks({
-        selector: 'main.bg-white > .mx-auto > .mb-8 > .grid:nth-child(2) > .bg-white a.font-semibold',
-        label: 'DETAIL', // <= note the different label
-      });
+      
+      // Enqueue detail pages with deduplication
+      const detailLinks = await page.locator('main.bg-white > .mx-auto > .mb-8 > .grid:nth-child(2) > .bg-white a.font-semibold').all();
+      const newDetailUrls = [];
+      
+      for (const link of detailLinks) {
+        const href = await link.getAttribute('href');
+        if (href && !processedUrls.has(href)) {
+          newDetailUrls.push(href);
+        }
+      }
+      
+      // Enqueue new detail URLs
+      for (const url of newDetailUrls) {
+        await crawler.addRequests([{ url, label: 'DETAIL' }]);
+      }
+      
+      log.info(`Enqueued ${newDetailUrls.length} new detail pages`);
 
       // Now we need to find the "Next" button and enqueue the next page of results (if it exists)
       const nextButton = await page.$('.isolate a.px-4:has-text("Next")');
       if (nextButton) {
-        await enqueueLinks({
-          selector: '.isolate a.px-4:has-text("Next")',
-          label: 'CATEGORY', // <= note the same label
-        });
+        const nextHref = await nextButton.getAttribute('href');
+        if (nextHref && !processedUrls.has(nextHref)) {
+          await crawler.addRequests([{ url: nextHref, label: 'CATEGORY' }]);
+          log.info(`Enqueued next page: ${nextHref}`);
+        }
       }
     }
   },
@@ -165,13 +194,14 @@ const crawler = new PlaywrightCrawler({
 try {
   // Run the crawler with cookie authentication
   await crawler.run([
-    { url: 'https://recordowl.com/ssic/clinics-and-other-general-medical-services', label: 'INITIAL' }
+    { url: 'https://recordowl.com/ssic/clinics-and-other-general-medical-services', label: 'CATEGORY' }
   ]);
   
   // Get the dataset info
   const dataset = await Dataset.open();
   const datasetInfo = await dataset.getInfo();
   console.log(`Crawling completed. Dataset contains ${datasetInfo.itemCount} items.`);
+  console.log(`Total URLs processed: ${processedUrls.size}`);
   
 } catch (error) {
   console.error('Crawling failed:', error);
