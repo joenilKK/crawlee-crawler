@@ -7,7 +7,7 @@ import path from 'path';
 // Load cookies from JSON file
 const loadCookies = () => {
   try {
-    const cookiePath = path.join(process.cwd(), 'src', 'recordowl.com_json_1758075767304.json');
+    const cookiePath = path.join(process.cwd(), 'src', 'recordowl-cookies.json');
     const cookieData = fs.readFileSync(cookiePath, 'utf8');
     return JSON.parse(cookieData);
   } catch (error) {

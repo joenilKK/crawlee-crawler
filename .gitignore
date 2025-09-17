@@ -87,6 +87,7 @@ storage/
 !.actor/actor.json
 !package.json
 !package-lock.json
+!src/recordowl-cookies.json
 
 # Backup files
 *_backup_*
