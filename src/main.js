@@ -126,6 +126,46 @@ const crawler = new PlaywrightCrawler({
       const registrationNumber = await getTextOrNull(page.locator('h3:has-text("General Information") + p.mt-1'));
       const address = await getTextOrNull(page.locator('dt:has-text("Registered Address") + dd.mt-1 a'));
       const status = await getTextOrNull(page.locator('dt:has-text("Operating Status") + dd.mt-1'));
+      // Building Name
+      let buildingName = null;
+      try {
+        buildingName = await getTextOrNull(page.locator('dt:has-text("Building") + dd.mt-1'));
+      } catch (e) {
+        buildingName = null;
+      }
+
+      // Contact Number
+      let contactNumberString = null;
+      try {
+        const contactNumberElement = page
+          .locator('dt:has-text("Contact Number") + dd.mt-1')
+          .filter({
+              hasText: '+',
+          })
+          .first();
+        if (await contactNumberElement.count() > 0) {
+          contactNumberString = await contactNumberElement.textContent();
+          contactNumberString = contactNumberString ? contactNumberString.trim() : null;
+        }
+      } catch (e) {
+        contactNumberString = null;
+      }
+
+      // Company Email
+      let companyEmail = null;
+      try {
+        companyEmail = await getTextOrNull(page.locator('dt:has-text("Email") + dd.mt-1 a'));
+      } catch (e) {
+        companyEmail = null;
+      }
+
+      // Company Website
+      let companyWebsite = null;
+      try {
+        companyWebsite = await getTextOrNull(page.locator('dt:has-text("Website") + dd.mt-1 a'));
+      } catch (e) {
+        companyWebsite = null;
+      }
       // Try to get company age with more specific selector
       let companyAge = null;
       try {
@@ -157,12 +197,16 @@ const crawler = new PlaywrightCrawler({
       const results = {
         url: request.url,
         title,
-        "Specialty": specialist,
+        //"Specialty": specialist,
         "General Information": {
           "Registration Number": registrationNumber,
           "Address": address,
           "Status": status,
-          "Company Age": companyAge
+          "Company Age": companyAge,
+          "Building Name": buildingName,
+          "Contact Number": contactNumberString,
+          "Company Email": companyEmail,
+          "Company Website": companyWebsite
         },
         "Industry Classification" : {
           "Primary SSIC Code": primaryssic,
@@ -224,7 +268,7 @@ const crawler = new PlaywrightCrawler({
   },
 
   // Let's limit our crawls to make our tests shorter and safer.
-  maxRequestsPerCrawl: 5,
+  //maxRequestsPerCrawl: 5,
 });
 
 try {
