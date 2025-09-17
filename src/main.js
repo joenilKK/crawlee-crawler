@@ -130,7 +130,7 @@ const crawler = new PlaywrightCrawler({
       //const contactNumberString = await getTextOrNull(page.locator('dt:has-text("Contact Number") + dd.mt-1'));
       //const companyEmail = await getTextOrNull(page.locator('dt:has-text("Email") + dd.mt-1 a'));
       //const companyWebsite = await getTextOrNull(page.locator('dt:has-text("Website") + dd.mt-1 a'));
-      // const companyAge = await getTextOrNull(page.locator('div#overview dt:has-text("Company Age") + dd'));
+      const companyAge = await getTextOrNull(page.locator('div#overview dt:has-text("Company Age") + dd'));
     
 
       const primaryssic = await getTextOrNull(page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a'));
@@ -146,7 +146,7 @@ const crawler = new PlaywrightCrawler({
           "Registration Number": registrationNumber,
           "Address": address,
           "Status": status,
-          // "Company Age": companyAge,
+          "Company Age": companyAge,
           // "Building Name": buildingName,
           // "Contact Number": contactNumberString,
           // "Company Email": companyEmail,
