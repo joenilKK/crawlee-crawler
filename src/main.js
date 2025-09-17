@@ -108,7 +108,7 @@ const crawler = new PlaywrightCrawler({
       const registrationNumber = await getTextOrNull(page.locator('h3:has-text("General Information") + p.mt-1'));
       const address = await getTextOrNull(page.locator('dt:has-text("Registered Address") + dd.mt-1 a'));
       const status = await getTextOrNull(page.locator('dt:has-text("Operating Status") + dd.mt-1'));
-      const companyAge = await getTextOrNull(page.locator('dt:has-text("Company Age") + dd.mt-1'));
+      const companyAge = await getTextOrNull(page.locator('dt.text-sm:has-text("Company Age") + dd.mt-1'));
 
       const primaryssic = await getTextOrNull(page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a'));
       const primaryIndustry = await getTextOrNull(page.locator('dt:has-text("Primary Industry") + dd.mt-1 a'));
