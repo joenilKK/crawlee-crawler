@@ -92,9 +92,32 @@ const crawler = new PlaywrightCrawler({
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
 
       const title = await page.locator('h1.text-xl').textContent();
+      const specialist = await page.locator('span[itemprop="industry"]').textContent();
+      const registrationNumber = await page.locator('h3:has-text("General Information") + p.mt-1').textContent();
+      const address = await page.locator('h3:has-text("Registered Address") + span a').textContent();
+      const status = await page.locator('dt:has-text("Operating Status") + dd.mt-1').textContent();
+      const companyAge = await page.locator('dt:has-text("Company Age") + dd.mt-1').textContent();
+
+      const primaryssic = await page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a').textContent();
+      const primaryIndustry = await page.locator('dt:has-text("Primary Industry") + dd.mt-1 a').textContent();
+      const secondaryssic = await page.locator('dt:has-text("Secondary SSIC Code") + dd.mt-1 a').textContent();
+      const secondaryIndustry = await page.locator('dt:has-text("Secondary Industry") + dd.mt-1 a').textContent();
       const results = {
         url: request.url,
         title,
+        "Specialty": specialist,
+        "General Information": {
+          "Registration Number": registrationNumber,
+          "Address": address,
+          "Status": status,
+          "Company Age": companyAge
+        },
+        "Industry Classification" : {
+          "Primary SSIC Code": primaryssic,
+          "Primary Industry": primaryIndustry,
+          "Secondary SSIC Code": secondaryssic,
+          "Secondary Industry": secondaryIndustry
+        }
       };
 
 
