@@ -1,0 +1,33 @@
+{
+  "title": "Data.gov.sg Crawler Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "resourceIds": {
+      "title": "Resource IDs",
+      "type": "array",
+      "description": "Array of resource IDs to crawl from data.gov.sg",
+      "editor": "stringList",
+      "isRequired": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "startDate": {
+      "title": "Start Date",
+      "type": "string",
+      "description": "Start date for data crawling (YYYY-MM-DD format)",
+      "editor": "textfield",
+      "isRequired": true,
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "endDate": {
+      "title": "End Date", 
+      "type": "string",
+      "description": "End date for data crawling (YYYY-MM-DD format)",
+      "editor": "textfield",
+      "isRequired": true,
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    }
+  }
+}

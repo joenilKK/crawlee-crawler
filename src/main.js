@@ -1,96 +1,96 @@
-import { PlaywrightCrawler, Dataset, Actor } from 'crawlee';
-
-const crawler = new PlaywrightCrawler({
-  // Apify proxy configuration
-  proxyConfiguration: new Actor.createProxyConfiguration({
-    groups: ['RESIDENTIAL'],
-    countryCode: 'US',
-  }),
-  
-  // Browser configuration for Apify
-  launchContext: {
-    launchOptions: {
-      headless: true,
-    },
-  },
-  
-  // Request configuration
-  requestHandlerTimeoutSecs: 60,
-  maxRequestRetries: 3,
-  
-  requestHandler: async ({ page, request, enqueueLinks }) => {
-
-    console.log(`Processing: ${request.url}`);
-    if (request.label === 'DETAIL') {
-      const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
-
-      const title = await page.locator('.panel-heading h1').textContent();
-      const table_head = await page.locator('#overview .panel-heading h2').textContent();
-
-      // Get all rows in the #overview table tbody
-      const rows = await page.locator('#overview table tbody tr');
-      const tableData = [];
-      const rowCount = await rows.count();
-      for (let i = 0; i < rowCount; i++) {
-        const row = rows.nth(i);
-        const tds = row.locator('td');
-        const key = (await tds.nth(0).textContent())?.trim();
-        const value = (await tds.nth(1).textContent())?.trim();
-        if (key && value) {
-          tableData.push({ title: key, content: value });
-        }
-      }
-
-      const results = {
-        url: request.url,
-        title,
-        table_head,
-        tableData
-      };
-
-      // Save each URL as a separate object to the dataset
-      await Dataset.pushData(results);
-      console.log(`Saved data for: ${request.url}`);
-    } else {
-      // We are now on a category page. We can use this to paginate through and enqueue all products,
-      // as well as any subsequent pages we find
-
-      await page.waitForSelector('.table td a');
-      await enqueueLinks({
-        selector: '.table td a',
-        label: 'DETAIL', // <= note the different label
-      });
-
-      // Now we need to find the "Next" button and enqueue the next page of results (if it exists)
-      const nextButton = await page.$('ul.pager li a');
-      if (nextButton) {
-        await enqueueLinks({
-          selector: 'ul.pager li a',
-          label: 'CATEGORY', // <= note the same label
-        });
-      }
-    }
-  },
-
-  // Let's limit our crawls to make our tests shorter and safer.
-  maxRequestsPerCrawl: 5,
-});
+import { Actor } from 'apify';
+import { Dataset } from 'crawlee';
 
 // Initialize the Actor
 await Actor.init();
 
-try {
-  // Run the crawler
-  await crawler.run(['https://opengovsg.com/corporate?ssic=86201']);
+// Get input from Apify
+const input = await Actor.getInput();
+const { resourceIds, startDate, endDate } = input;
+
+// Validate input
+if (!resourceIds || !Array.isArray(resourceIds) || resourceIds.length === 0) {
+  throw new Error('resourceIds must be a non-empty array');
+}
+
+if (!startDate || !endDate) {
+  throw new Error('startDate and endDate are required');
+}
+
+// Validate date format (YYYY-MM-DD)
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+  throw new Error('Dates must be in YYYY-MM-DD format');
+}
+
+// Parse dates
+const start = new Date(startDate);
+const end = new Date(endDate);
+
+if (start > end) {
+  throw new Error('startDate must be before or equal to endDate');
+}
+
+// Generate date range
+const generateDateRange = (startDate, endDate) => {
+  const dates = [];
+  const current = new Date(startDate);
+  const end = new Date(endDate);
   
-  // Get the dataset info
+  while (current <= end) {
+    dates.push(current.toISOString().split('T')[0]);
+    current.setDate(current.getDate() + 1);
+  }
+  
+  return dates;
+};
+
+const dates = generateDateRange(start, end);
+
+const fetchAllData = async () => {
   const dataset = await Dataset.open();
-  const datasetInfo = await dataset.getInfo();
-  console.log(`Crawling completed. Dataset contains ${datasetInfo.itemCount} items.`);
   
+  for (const resourceId of resourceIds) {
+    for (const dateStr of dates) {
+      const url = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&filters=%7B%22uen_issue_date%22%3A%22${dateStr}%22%7D`;
+      
+      try {
+        Actor.log.info(`Fetching data for resource ${resourceId} on ${dateStr}`);
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Store data in Apify dataset
+        const record = {
+          resourceId,
+          date: dateStr,
+          data,
+          timestamp: new Date().toISOString()
+        };
+        
+        await dataset.pushData(record);
+        Actor.log.info(`Successfully stored data for resource ${resourceId} on ${dateStr}`);
+        
+      } catch (error) {
+        Actor.log.error(`Error fetching data for resource ${resourceId} on ${dateStr}:`, error);
+        // Continue with next iteration instead of stopping
+      }
+    }
+  }
+};
+
+// Run the main function
+try {
+  await fetchAllData();
+  Actor.log.info('Data fetching completed successfully');
 } catch (error) {
-  console.error('Crawling failed:', error);
-  await Actor.fail(error);
+  Actor.log.error('Fatal error:', error);
+  throw error;
 } finally {
   await Actor.exit();
 }

@@ -1,0 +1,12 @@
+{
+  "actorSpecification": 1,
+  "name": "data-gov-sg-crawler",
+  "title": "Data.gov.sg Data Crawler",
+  "description": "Crawls data from data.gov.sg API for specified resource IDs and date ranges",
+  "version": "0.0.1",
+  "meta": {
+    "templateId": "crawlee-actor"
+  },
+  "input": "./input_schema.json",
+  "dockerfile": "./Dockerfile"
+}
