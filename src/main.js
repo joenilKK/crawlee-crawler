@@ -54,7 +54,10 @@ const crawler = new PlaywrightCrawler({
         await page.waitForNavigation({ waitUntil: 'networkidle' });
         
         // Check if we're on Google's OAuth page
-        const isGoogleOAuth = await page.url().includes('accounts.google.com');
+        const currentUrl = page.url();
+        log.info(`Current URL after Google button click: ${currentUrl}`);
+        
+        const isGoogleOAuth = currentUrl.includes('accounts.google.com');
         if (isGoogleOAuth) {
           log.info('On Google OAuth page, entering credentials...');
           
@@ -79,16 +82,31 @@ const crawler = new PlaywrightCrawler({
           // Wait for OAuth flow to complete and redirect back
           await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 });
           
-          log.info('Google OAuth login completed successfully');
+          const finalUrl = page.url();
+          log.info(`Google OAuth login completed. Final URL: ${finalUrl}`);
         } else {
-          // Fallback to regular form login if Google OAuth button not found
-          log.info('Google OAuth not detected, trying regular form login...');
+          // Check if we're already logged in or if it's a different auth flow
+          log.info(`Not on Google OAuth page. Current URL: ${currentUrl}`);
           
-          await page.waitForSelector('input[name="username"], input[name="email"], input[type="email"]', { timeout: 10000 });
-          await page.fill('input[name="username"], input[name="email"], input[type="email"]', USERNAME);
-          await page.fill('input[name="password"], input[type="password"]', PASSWORD);
-          await page.click('button[type="submit"], input[type="submit"], .login-button, #login-button');
-          await page.waitForNavigation({ waitUntil: 'networkidle' });
+          // Check if we're already logged in by looking for logout buttons or user profile elements
+          const isLoggedIn = await page.$('a[href*="logout"], .logout, .user-profile, .user-menu') !== null;
+          if (isLoggedIn) {
+            log.info('Already logged in or login completed automatically');
+          } else {
+            // Fallback to regular form login if Google OAuth button not found
+            log.info('Google OAuth not detected, trying regular form login...');
+            
+            try {
+              await page.waitForSelector('input[name="username"], input[name="email"], input[type="email"]', { timeout: 10000 });
+              await page.fill('input[name="username"], input[name="email"], input[type="email"]', USERNAME);
+              await page.fill('input[name="password"], input[type="password"]', PASSWORD);
+              await page.click('button[type="submit"], input[type="submit"], .login-button, #login-button');
+              await page.waitForNavigation({ waitUntil: 'networkidle' });
+              log.info('Regular form login completed');
+            } catch (error) {
+              log.warning('Regular form login failed, but continuing with crawl');
+            }
+          }
         }
       }
     }
@@ -100,31 +118,10 @@ const crawler = new PlaywrightCrawler({
     if (request.label === 'DETAIL') {
       const urlPart = request.url.split('/').slice(-1); // ['sennheiser-mke-440-professional-stereo-shotgun-microphone-mke-440']
 
-      const title = await page.locator('.doctor-profile h1').textContent();
-      const speciality = await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(1) .doctor-profile__item-detail span').textContent();
-      const languageElements = await page.locator('.doctor-profile ul li.doctor-profile__item:nth-child(2) .doctor-profile__item-detail span');
-      const languageCount = await languageElements.count();
-      const language = [];
-      for (let i = 0; i < languageCount; i++) {
-        const lang = await languageElements.nth(i).textContent();
-        if (lang) language.push(lang.trim());
-      }
-
-      const telnumber = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info:nth-child(1) a').textContent();
-      const faxnumber = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info:nth-child(2) span:nth-child(2)').textContent();
-      const email = await page.locator('.clinic-item .clinic-item__con:nth-child(1) .clinic-item__info a.clinic-item__email').textContent();
-      const address = await page.locator('.clinic-item .clinic-item__con:nth-child(2) .clinic-item__info:nth-child(1) span:nth-child(2)').textContent();
-      
+      const title = await page.locator('h1.text-xl').textContent();
       const results = {
         url: request.url,
         title,
-        speciality,
-        telnumber,
-        faxnumber,
-        email,
-        address,
-        language,
-
       };
 
 
@@ -135,17 +132,17 @@ const crawler = new PlaywrightCrawler({
       // We are now on a category page. We can use this to paginate through and enqueue all products,
       // as well as any subsequent pages we find
 
-      await page.waitForSelector('.list-doctor .list-doctor__view a.btn-fph');
+      await page.waitForSelector('main.bg-white > .mx-auto > .mb-8 > .grid:nth-child(2) > .bg-white a.font-semibold');
       await enqueueLinks({
-        selector: '.list-doctor .list-doctor__view a.btn-fph',
+        selector: 'main.bg-white > .mx-auto > .mb-8 > .grid:nth-child(2) > .bg-white a.font-semibold',
         label: 'DETAIL', // <= note the different label
       });
 
       // Now we need to find the "Next" button and enqueue the next page of results (if it exists)
-      const nextButton = await page.$('body > .container > .row > .col-12.col-md-6 > nav .pagination .page-item a.page-link[title="next"]');
+      const nextButton = await page.$('.isolate a.px-4:has-text("Next")');
       if (nextButton) {
         await enqueueLinks({
-          selector: 'body > .container > .row > .col-12.col-md-6 > nav .pagination .page-item a.page-link[title="next"]',
+          selector: '.isolate a.px-4:has-text("Next")',
           label: 'CATEGORY', // <= note the same label
         });
       }
