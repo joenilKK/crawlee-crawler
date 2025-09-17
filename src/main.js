@@ -169,13 +169,7 @@ const crawler = new PlaywrightCrawler({
       // Try to get company age with more specific selector
       let companyAge = null;
       try {
-        // First try to get the first match
-        const companyAgeElements = page.locator('div.block dt:has-text("Company Age") + dd.mt-1');
-        const count = await companyAgeElements.count();
-        if (count > 0) {
-          companyAge = await companyAgeElements.first().textContent();
-          companyAge = companyAge ? companyAge.trim() : null;
-        }
+        companyAge = await page.locator('div.block#overview dt:has-text("Company Age") + dd.mt-1').textContent();
       } catch (error) {
         console.log('Error getting company age:', error.message);
       }
