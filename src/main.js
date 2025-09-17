@@ -170,7 +170,7 @@ const crawler = new PlaywrightCrawler({
       let companyAge = null;
       try {
         // First try to get the first match
-        const companyAgeElements = page.locator('dt:has-text("Company Age") + dd');
+        const companyAgeElements = page.locator('.bg-white shadow .py-4 dt:has-text("Company Age") + dd');
         const count = await companyAgeElements.count();
         if (count > 0) {
           companyAge = await companyAgeElements.first().textContent();
@@ -178,15 +178,6 @@ const crawler = new PlaywrightCrawler({
         }
       } catch (error) {
         console.log('Error getting company age:', error.message);
-        // Fallback: try to find by looking for dd elements that contain time-related text
-        const allDds = await page.locator('dd').all();
-        for (const dd of allDds) {
-          const text = await dd.textContent();
-          if (text && (text.includes('days') || text.includes('years') || text.includes('months'))) {
-            companyAge = text.trim();
-            break;
-          }
-        }
       }
 
       const primaryssic = await getTextOrNull(page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a'));
