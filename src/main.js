@@ -167,18 +167,7 @@ const crawler = new PlaywrightCrawler({
         companyWebsite = null;
       }
       // Try to get company age with more specific selector
-      let companyAge = null;
-      try {
-        // First try to get the first match
-        const companyAgeElements = page.locator('.bg-white.shadow .py-4 dt:has-text("Company Age") + dd');
-        const count = await companyAgeElements.count();
-        if (count > 0) {
-          companyAge = await companyAgeElements.first().textContent();
-          companyAge = companyAge ? companyAge.trim() : null;
-        }
-      } catch (error) {
-        console.log('Error getting company age:', error.message);
-      }
+      const companyAge = await getTextOrNull(page.locator('#overview dt:has-text("Company Age") + dd.mt-1'));
 
       const primaryssic = await getTextOrNull(page.locator('dt:has-text("Primary SSIC Code") + dd.mt-1 a'));
       const primaryIndustry = await getTextOrNull(page.locator('dt:has-text("Primary Industry") + dd.mt-1 a'));
