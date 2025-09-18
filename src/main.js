@@ -22,15 +22,8 @@ async function main() {
       if (typeof input === 'string') {
         parsedInput = JSON.parse(input);
       } else if (input && typeof input === 'object') {
-        // Check if it's a stringified object with numeric keys
-        if (input['0'] && typeof input['0'] === 'string') {
-          // Reconstruct the string from the object
-          const inputString = Object.values(input).join('');
-          parsedInput = JSON.parse(inputString);
-        } else {
-          // It's already a proper object
-          parsedInput = input;
-        }
+        // It's already a proper object, use it directly
+        parsedInput = input;
       } else {
         throw new Error('Invalid input type');
       }
