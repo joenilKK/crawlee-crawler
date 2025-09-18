@@ -9,16 +9,11 @@ async function main() {
   try {
     log.info('Actor initialized successfully');
 
-    // Predefined array of key-value pairs
-    const resourceMap = {
-      "a": "d_8575e84912df3c28995b8e6e0e05205a",
-      "b": "d_3a3807c023c61ddfba947dc069eb53f2"
-    };
-
     // Get input from Actor
     const input = await Actor.getInput();
     
-    // Extract startDate and endDate from input
+    // Extract resourceIds, startDate and endDate from input
+    const resourceIds = input.resourceIds;
     const startDate = input.startDate;
     const endDate = input.endDate;
 
@@ -41,9 +36,8 @@ async function main() {
       throw new Error('startDate must be before or equal to endDate');
     }
 
-    const resourceIds = Object.values(resourceMap);
     log.info(`Processing ${resourceIds.length} resource(s) from ${startDate} to ${endDate}`);
-    log.info('Resource mapping:', resourceMap);
+    log.info('Resource IDs:', resourceIds);
 
     // Generate date range
     const generateDateRange = (startDate, endDate) => {
@@ -69,15 +63,15 @@ async function main() {
       const dataset = await Dataset.open();
       let totalRecords = 0;
       
-      // Loop through each key-value pair in the resource map
-      for (const [key, resourceId] of Object.entries(resourceMap)) {
-        log.info(`Processing resource key '${key}' with ID: ${resourceId}`);
+      // Loop through each resource ID
+      for (const resourceId of resourceIds) {
+        log.info(`Processing resource ID: ${resourceId}`);
         
         for (const dateStr of dates) {
           const url = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&filters=%7B%22uen_issue_date%22%3A%22${dateStr}%22%7D`;
           
           try {
-            log.info(`Fetching data for resource key '${key}' (${resourceId}) on ${dateStr}`);
+            log.info(`Fetching data for resource ID '${resourceId}' on ${dateStr}`);
             
             const response = await fetch(url);
             
@@ -89,7 +83,7 @@ async function main() {
             
             // Check if there are records in the response
             const records = data.result?.records || [];
-            log.info(`Found ${records.length} records for resource key '${key}' on ${dateStr}`);
+            log.info(`Found ${records.length} records for resource ID '${resourceId}' on ${dateStr}`);
             
             // Store each record individually in Apify dataset
             for (const record of records) {
@@ -97,10 +91,10 @@ async function main() {
               totalRecords++;
             }
             
-            log.info(`Successfully stored ${records.length} individual records for resource key '${key}' on ${dateStr}`);
+            log.info(`Successfully stored ${records.length} individual records for resource ID '${resourceId}' on ${dateStr}`);
             
           } catch (error) {
-            log.error(`Error fetching data for resource key '${key}' on ${dateStr}:`, error);
+            log.error(`Error fetching data for resource ID '${resourceId}' on ${dateStr}:`, error);
             // Continue with next iteration instead of stopping
           }
         }
