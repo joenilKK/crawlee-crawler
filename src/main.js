@@ -88,19 +88,13 @@ async function main() {
             const records = data.result?.records || [];
             log.info(`Found ${records.length} records for resource key '${key}' on ${dateStr}`);
             
-            // Store data in Apify dataset
-            const record = {
-              resourceKey: key,
-              resourceId,
-              date: dateStr,
-              data,
-              recordCount: records.length,
-              timestamp: new Date().toISOString()
-            };
+            // Store each record individually in Apify dataset
+            for (const record of records) {
+              await dataset.pushData(record);
+              totalRecords++;
+            }
             
-            await dataset.pushData(record);
-            totalRecords += records.length;
-            log.info(`Successfully stored data for resource key '${key}' on ${dateStr} (${records.length} records)`);
+            log.info(`Successfully stored ${records.length} individual records for resource key '${key}' on ${dateStr}`);
             
           } catch (error) {
             log.error(`Error fetching data for resource key '${key}' on ${dateStr}:`, error);
