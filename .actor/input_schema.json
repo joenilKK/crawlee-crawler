@@ -6,10 +6,14 @@
     "resourceMap": {
       "title": "Resource IDs",
       "type": "object",
-      "description": "Key-value mapping of resource IDs to crawl from data.gov.sg",
-      "additionalProperties": {
-        "type": "string"
-      }
+      "description": "Key-value mapping of resource IDs to crawl from data.gov.sg (supports a-z)",
+      "patternProperties": {
+        "^[a-z]$": {
+          "type": "string",
+          "title": "Resource ID"
+        }
+      },
+      "additionalProperties": false
     },
     "startDate": {
       "title": "Start Date",
