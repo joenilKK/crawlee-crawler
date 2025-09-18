@@ -1,5 +1,10 @@
-import { Actor } from 'apify';
+import { Actor, log } from 'apify';
 import { Dataset } from 'crawlee';
+
+// Debug: Check what we're importing
+console.log('Actor object:', Actor);
+console.log('Actor type:', typeof Actor);
+console.log('log object:', log);
 
 // Main execution function
 async function main() {
@@ -7,12 +12,12 @@ async function main() {
   await Actor.init();
   
   try {
-    Actor.log.info('Actor initialized successfully');
+    log.info('Actor initialized successfully');
 
     // Get input from Apify
-    Actor.log.info('Getting input from Apify...');
+    log.info('Getting input from Apify...');
     const input = await Actor.getInput();
-    Actor.log.info('Input received:', JSON.stringify(input, null, 2));
+    log.info('Input received:', JSON.stringify(input, null, 2));
     
     const { resourceIds, startDate, endDate } = input;
 
@@ -39,7 +44,7 @@ async function main() {
       throw new Error('startDate must be before or equal to endDate');
     }
 
-    Actor.log.info(`Processing ${resourceIds.length} resource(s) from ${startDate} to ${endDate}`);
+    log.info(`Processing ${resourceIds.length} resource(s) from ${startDate} to ${endDate}`);
 
     // Generate date range
     const generateDateRange = (startDate, endDate) => {
@@ -56,20 +61,20 @@ async function main() {
     };
 
     const dates = generateDateRange(start, end);
-    Actor.log.info(`Generated ${dates.length} dates to process`);
+    log.info(`Generated ${dates.length} dates to process`);
 
     const fetchAllData = async () => {
       const dataset = await Dataset.open();
       let totalRecords = 0;
       
       for (const resourceId of resourceIds) {
-        Actor.log.info(`Processing resource: ${resourceId}`);
+        log.info(`Processing resource: ${resourceId}`);
         
         for (const dateStr of dates) {
           const url = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&filters=%7B%22uen_issue_date%22%3A%22${dateStr}%22%7D`;
           
           try {
-            Actor.log.info(`Fetching data for resource ${resourceId} on ${dateStr}`);
+            log.info(`Fetching data for resource ${resourceId} on ${dateStr}`);
             
             const response = await fetch(url);
             
@@ -81,7 +86,7 @@ async function main() {
             
             // Check if there are records in the response
             const records = data.result?.records || [];
-            Actor.log.info(`Found ${records.length} records for resource ${resourceId} on ${dateStr}`);
+            log.info(`Found ${records.length} records for resource ${resourceId} on ${dateStr}`);
             
             // Store data in Apify dataset
             const record = {
@@ -94,27 +99,27 @@ async function main() {
             
             await dataset.pushData(record);
             totalRecords += records.length;
-            Actor.log.info(`Successfully stored data for resource ${resourceId} on ${dateStr} (${records.length} records)`);
+            log.info(`Successfully stored data for resource ${resourceId} on ${dateStr} (${records.length} records)`);
             
           } catch (error) {
-            Actor.log.error(`Error fetching data for resource ${resourceId} on ${dateStr}:`, error);
+            log.error(`Error fetching data for resource ${resourceId} on ${dateStr}:`, error);
             // Continue with next iteration instead of stopping
           }
         }
       }
       
-      Actor.log.info(`Total records processed: ${totalRecords}`);
+      log.info(`Total records processed: ${totalRecords}`);
     };
 
     // Run the main function
     await fetchAllData();
-    Actor.log.info('Data fetching completed successfully');
+    log.info('Data fetching completed successfully');
     
   } catch (error) {
-    Actor.log.error('Fatal error in main execution:', error);
+    log.error('Fatal error in main execution:', error);
     throw error;
   } finally {
-    Actor.log.info('Exiting Actor...');
+    log.info('Exiting Actor...');
     await Actor.exit();
   }
 }
