@@ -62,6 +62,8 @@ async function main() {
     const fetchAllData = async () => {
       const dataset = await Dataset.open();
       let totalRecords = 0;
+      let duplicateRecords = 0;
+      const processedUENs = new Set(); // Track processed UENs to prevent duplicates
       
       // Loop through each resource ID
       for (let i = 0; i < resourceIds.length; i++) {
@@ -86,13 +88,24 @@ async function main() {
             const records = data.result?.records || [];
             log.info(`Found ${records.length} records for resource ${i + 1} on ${dateStr}`);
             
-            // Store each record individually in Apify dataset
+            // Process each record with deduplication
             for (const record of records) {
+              const uen = record.uen;
+              
+              // Check if this UEN has already been processed
+              if (processedUENs.has(uen)) {
+                duplicateRecords++;
+                log.debug(`Skipping duplicate record for UEN: ${uen} (${record.entity_name})`);
+                continue;
+              }
+              
+              // Add UEN to processed set and save record
+              processedUENs.add(uen);
               await dataset.pushData(record);
               totalRecords++;
             }
             
-            log.info(`Successfully stored ${records.length} individual records for resource ${i + 1} on ${dateStr}`);
+            log.info(`Successfully stored ${records.length} records for resource ${i + 1} on ${dateStr} (${duplicateRecords} duplicates skipped)`);
             
           } catch (error) {
             log.error(`Error fetching data for resource ${i + 1} on ${dateStr}:`, error);
@@ -101,7 +114,8 @@ async function main() {
         }
       }
       
-      log.info(`Total records processed: ${totalRecords}`);
+      log.info(`Total unique records processed: ${totalRecords}`);
+      log.info(`Total duplicate records skipped: ${duplicateRecords}`);
     };
 
     // Run the main function
