@@ -7,6 +7,7 @@
       "title": "Resource IDs",
       "type": "object",
       "description": "Key-value mapping of resource IDs to crawl from data.gov.sg (supports a-z)",
+      "editor": "object",
       "properties": {
         "a": {
           "type": "string",
