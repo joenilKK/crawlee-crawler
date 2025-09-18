@@ -71,7 +71,7 @@ async function main() {
         log.info(`Processing resource ${i + 1}/${resourceIds.length}: ${resourceId}`);
         
         for (const dateStr of dates) {
-          const url = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&fields=uen%2Cuen_issue_date%2C+registration_incorporation_date%2C+entity_name%2Caddress_type%2Cbuilding_name&filters=%7B%22uen_issue_date%22%3A%22${dateStr}%22%2C%22primary_ssic_code%22%3A%2286201%22%7D&q=%7B%22uen_issue_date%22%3A%22${dateStr}%22%2C%22secondary_ssic_code%22%3A%2286201%22%7D`;
+          const url = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&fields=uen%2Cuen_issue_date%2C+registration_incorporation_date%2C+entity_name%2Caddress_type%2Cbuilding_name%2Cstreet_name&filters=%7B%22uen_issue_date%22%3A%22${dateStr}%22%2C%22primary_ssic_code%22%3A%2286201%22%7D`;
           
           try {
             log.info(`Fetching data for resource ${i + 1} (${resourceId}) on ${dateStr}`);
