@@ -110,11 +110,15 @@ const main = async () => {
     Actor.log.info('Data fetching completed successfully');
     
   } catch (error) {
-    Actor.log.error('Fatal error in main execution:', error);
+    console.error('Fatal error in main execution:', error);
     throw error;
   } finally {
-    Actor.log.info('Exiting Actor...');
-    await Actor.exit();
+    try {
+      console.log('Exiting Actor...');
+      await Actor.exit();
+    } catch (exitError) {
+      console.error('Error during Actor exit:', exitError);
+    }
   }
 };
 
