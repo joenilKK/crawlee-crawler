@@ -110,9 +110,13 @@ async function main() {
                   continue;
                 }
                 
-                // Add UEN to processed set and save record
+                // Add UEN to processed set and save record with SSIC source info
                 processedUENs.add(uen);
-                await dataset.pushData(record);
+                const recordWithSource = {
+                  ...record,
+                  ssic_source: ssicConfig.type
+                };
+                await dataset.pushData(recordWithSource);
                 totalRecords++;
               }
               
