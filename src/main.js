@@ -3,12 +3,13 @@ import { Dataset } from 'crawlee';
 
 // Main execution function
 const main = async () => {
-  // Initialize the Actor first
-  await Actor.init();
+  let actorInitialized = false;
   
   try {
-    // Log after Actor is initialized
-    Actor.log.info('Initializing Actor...');
+    // Initialize the Actor first
+    await Actor.init();
+    actorInitialized = true;
+    Actor.log.info('Actor initialized successfully');
 
     // Get input from Apify
     Actor.log.info('Getting input from Apify...');
@@ -112,11 +113,19 @@ const main = async () => {
     Actor.log.info('Data fetching completed successfully');
     
   } catch (error) {
-    Actor.log.error('Fatal error in main execution:', error);
+    if (actorInitialized) {
+      Actor.log.error('Fatal error in main execution:', error);
+    } else {
+      console.error('Fatal error in main execution:', error);
+    }
     throw error;
   } finally {
-    Actor.log.info('Exiting Actor...');
-    await Actor.exit();
+    if (actorInitialized) {
+      Actor.log.info('Exiting Actor...');
+      await Actor.exit();
+    } else {
+      console.log('Exiting Actor...');
+    }
   }
 };
 
