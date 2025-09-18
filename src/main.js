@@ -14,7 +14,9 @@ async function main() {
     const input = await Actor.getInput();
     log.info('Input received:', JSON.stringify(input, null, 2));
     
-    const { resourceIds, startDate, endDate } = input;
+    // Parse input if it's a string
+    const parsedInput = typeof input === 'string' ? JSON.parse(input) : input;
+    const { resourceIds, startDate, endDate } = parsedInput;
 
     // Validate input
     if (!resourceIds || !Array.isArray(resourceIds) || resourceIds.length === 0) {
