@@ -12,13 +12,10 @@ async function main() {
     // Get input from Actor
     const input = await Actor.getInput();
     
-    // Extract resourceMap, startDate and endDate from input
-    const resourceMap = input.resourceMap;
+    // Extract resourceIds, startDate and endDate from input
+    const resourceIds = input.resourceIds;
     const startDate = input.startDate;
     const endDate = input.endDate;
-    
-    // Get resource IDs from the map values
-    const resourceIds = Object.values(resourceMap);
 
     // Validate date format (YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -40,7 +37,7 @@ async function main() {
     }
 
     log.info(`Processing ${resourceIds.length} resource(s) from ${startDate} to ${endDate}`);
-    log.info('Resource mapping:', resourceMap);
+    log.info('Resource IDs:', resourceIds);
 
     // Generate date range
     const generateDateRange = (startDate, endDate) => {
@@ -66,15 +63,16 @@ async function main() {
       const dataset = await Dataset.open();
       let totalRecords = 0;
       
-      // Loop through each key-value pair in the resource map
-      for (const [key, resourceId] of Object.entries(resourceMap)) {
-        log.info(`Processing resource key '${key}' with ID: ${resourceId}`);
+      // Loop through each resource ID
+      for (let i = 0; i < resourceIds.length; i++) {
+        const resourceId = resourceIds[i];
+        log.info(`Processing resource ${i + 1}/${resourceIds.length}: ${resourceId}`);
         
         for (const dateStr of dates) {
-          const url = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&filters=%7B%22uen_issue_date%22%3A%22${dateStr}%22%7D`;
+          const url = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&fields=uen%2Cuen_issue_date%2C+registration_incorporation_date%2C+entity_name%2Caddress_type%2Cbuilding_name&filters=%7B%22uen_issue_date%22%3A%22${dateStr}%22%2C%22primary_ssic_code%22%3A%2286201%22%7D&q=%7B%22uen_issue_date%22%3A%22${dateStr}%22%2C%22secondary_ssic_code%22%3A%2286201%22%7D`;
           
           try {
-            log.info(`Fetching data for resource key '${key}' (${resourceId}) on ${dateStr}`);
+            log.info(`Fetching data for resource ${i + 1} (${resourceId}) on ${dateStr}`);
             
             const response = await fetch(url);
             
@@ -86,7 +84,7 @@ async function main() {
             
             // Check if there are records in the response
             const records = data.result?.records || [];
-            log.info(`Found ${records.length} records for resource key '${key}' on ${dateStr}`);
+            log.info(`Found ${records.length} records for resource ${i + 1} on ${dateStr}`);
             
             // Store each record individually in Apify dataset
             for (const record of records) {
@@ -94,10 +92,10 @@ async function main() {
               totalRecords++;
             }
             
-            log.info(`Successfully stored ${records.length} individual records for resource key '${key}' on ${dateStr}`);
+            log.info(`Successfully stored ${records.length} individual records for resource ${i + 1} on ${dateStr}`);
             
           } catch (error) {
-            log.error(`Error fetching data for resource key '${key}' on ${dateStr}:`, error);
+            log.error(`Error fetching data for resource ${i + 1} on ${dateStr}:`, error);
             // Continue with next iteration instead of stopping
           }
         }

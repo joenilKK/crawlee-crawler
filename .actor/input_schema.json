@@ -3,13 +3,13 @@
   "type": "object",
   "schemaVersion": 1,
   "properties": {
-    "resourceMap": {
+    "resourceIds": {
       "title": "Resource IDs",
-      "type": "object",
-      "description": "Key-value mapping of resource IDs to crawl from data.gov.sg (supports a-z)",
-      "additionalProperties": {
-        "type": "string",
-        "description": "Resource identifier"
+      "type": "array",
+      "description": "Array of resource IDs to crawl from data.gov.sg",
+      "editor": "stringList",
+      "items": {
+        "type": "string"
       }
     },
     "startDate": {
@@ -31,5 +31,5 @@
       "maxLength": 10
     }
   },
-  "required": ["resourceMap", "startDate", "endDate"]
+  "required": ["resourceIds", "startDate", "endDate"]
 }
