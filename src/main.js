@@ -16,14 +16,28 @@ async function main() {
     log.info('Input length:', input?.length);
     log.info('Input preview:', input?.substring ? input.substring(0, 200) + '...' : input);
     
-    // Parse input if it's a string
+    // Parse input - handle both string and object cases
     let parsedInput;
     try {
-      parsedInput = typeof input === 'string' ? JSON.parse(input) : input;
+      if (typeof input === 'string') {
+        parsedInput = JSON.parse(input);
+      } else if (input && typeof input === 'object') {
+        // Check if it's a stringified object with numeric keys
+        if (input['0'] && typeof input['0'] === 'string') {
+          // Reconstruct the string from the object
+          const inputString = Object.values(input).join('');
+          parsedInput = JSON.parse(inputString);
+        } else {
+          // It's already a proper object
+          parsedInput = input;
+        }
+      } else {
+        throw new Error('Invalid input type');
+      }
       log.info('Successfully parsed input');
     } catch (parseError) {
-      log.error('Failed to parse input as JSON:', parseError);
-      throw new Error(`Invalid JSON input: ${parseError.message}`);
+      log.error('Failed to parse input:', parseError);
+      throw new Error(`Invalid input format: ${parseError.message}`);
     }
     
     log.info('Parsed input keys:', Object.keys(parsedInput));
