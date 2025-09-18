@@ -12,18 +12,33 @@ async function main() {
     // Get input from Apify
     log.info('Getting input from Apify...');
     const input = await Actor.getInput();
-    log.info('Input received:', JSON.stringify(input, null, 2));
+    log.info('Input type:', typeof input);
+    log.info('Input length:', input?.length);
+    log.info('Input preview:', input?.substring ? input.substring(0, 200) + '...' : input);
     
     // Parse input if it's a string
-    const parsedInput = typeof input === 'string' ? JSON.parse(input) : input;
+    let parsedInput;
+    try {
+      parsedInput = typeof input === 'string' ? JSON.parse(input) : input;
+      log.info('Successfully parsed input');
+    } catch (parseError) {
+      log.error('Failed to parse input as JSON:', parseError);
+      throw new Error(`Invalid JSON input: ${parseError.message}`);
+    }
+    
+    log.info('Parsed input keys:', Object.keys(parsedInput));
+    log.info('Parsed input values:', parsedInput);
+    
     const { resourceIds, startDate, endDate } = parsedInput;
 
     // Validate input
     if (!resourceIds || !Array.isArray(resourceIds) || resourceIds.length === 0) {
+      log.error('Invalid resourceIds:', resourceIds);
       throw new Error('resourceIds must be a non-empty array');
     }
 
     if (!startDate || !endDate) {
+      log.error('Missing dates - startDate:', startDate, 'endDate:', endDate);
       throw new Error('startDate and endDate are required');
     }
 
