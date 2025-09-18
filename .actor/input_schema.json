@@ -7,10 +7,31 @@
       "title": "Resource IDs",
       "type": "object",
       "description": "Key-value mapping of resource IDs to crawl from data.gov.sg (supports a-z)",
-      "patternProperties": {
-        "^[a-z]$": {
+      "properties": {
+        "a": {
           "type": "string",
-          "title": "Resource ID"
+          "title": "Resource A",
+          "description": "Resource ID for key 'a'"
+        },
+        "b": {
+          "type": "string",
+          "title": "Resource B", 
+          "description": "Resource ID for key 'b'"
+        },
+        "c": {
+          "type": "string",
+          "title": "Resource C",
+          "description": "Resource ID for key 'c'"
+        },
+        "d": {
+          "type": "string",
+          "title": "Resource D",
+          "description": "Resource ID for key 'd'"
+        },
+        "e": {
+          "type": "string",
+          "title": "Resource E",
+          "description": "Resource ID for key 'e'"
         }
       },
       "additionalProperties": false
