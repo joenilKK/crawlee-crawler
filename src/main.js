@@ -15,9 +15,12 @@ async function main() {
       "b": "d_3a3807c023c61ddfba947dc069eb53f2"
     };
 
-    // Define date range yyyy-mm-dd
-    const startDate = "2025-08-01";
-    const endDate = "2025-08-03";
+    // Get input from Actor
+    const input = await Actor.getInput();
+    
+    // Extract startDate and endDate from input
+    const startDate = input.startDate;
+    const endDate = input.endDate;
 
     // Validate date format (YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
