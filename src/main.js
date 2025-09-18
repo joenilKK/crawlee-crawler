@@ -9,45 +9,15 @@ async function main() {
   try {
     log.info('Actor initialized successfully');
 
-    // Get input from Apify
-    log.info('Getting input from Apify...');
-    const input = await Actor.getInput();
-    log.info('Input type:', typeof input);
-    log.info('Input length:', input?.length);
-    log.info('Input preview:', input?.substring ? input.substring(0, 200) + '...' : input);
-    
-    // Parse input - handle both string and object cases
-    let parsedInput;
-    try {
-      if (typeof input === 'string') {
-        parsedInput = JSON.parse(input);
-      } else if (input && typeof input === 'object') {
-        // It's already a proper object, use it directly
-        parsedInput = input;
-      } else {
-        throw new Error('Invalid input type');
-      }
-      log.info('Successfully parsed input');
-    } catch (parseError) {
-      log.error('Failed to parse input:', parseError);
-      throw new Error(`Invalid input format: ${parseError.message}`);
-    }
-    
-    log.info('Parsed input keys:', Object.keys(parsedInput));
-    log.info('Parsed input values:', parsedInput);
-    
-    const { resourceIds, startDate, endDate } = parsedInput;
+    // Predefined array of key-value pairs
+    const resourceMap = {
+      "a": "d_8575e84912df3c28995b8e6e0e05205a",
+      "b": "d_3a3807c023c61ddfba947dc069eb53f2"
+    };
 
-    // Validate input
-    if (!resourceIds || !Array.isArray(resourceIds) || resourceIds.length === 0) {
-      log.error('Invalid resourceIds:', resourceIds);
-      throw new Error('resourceIds must be a non-empty array');
-    }
-
-    if (!startDate || !endDate) {
-      log.error('Missing dates - startDate:', startDate, 'endDate:', endDate);
-      throw new Error('startDate and endDate are required');
-    }
+    // Define date range yyyy-mm-dd
+    const startDate = "2025-08-01";
+    const endDate = "2025-08-03";
 
     // Validate date format (YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -68,7 +38,9 @@ async function main() {
       throw new Error('startDate must be before or equal to endDate');
     }
 
+    const resourceIds = Object.values(resourceMap);
     log.info(`Processing ${resourceIds.length} resource(s) from ${startDate} to ${endDate}`);
+    log.info('Resource mapping:', resourceMap);
 
     // Generate date range
     const generateDateRange = (startDate, endDate) => {
@@ -94,14 +66,15 @@ async function main() {
       const dataset = await Dataset.open();
       let totalRecords = 0;
       
-      for (const resourceId of resourceIds) {
-        log.info(`Processing resource: ${resourceId}`);
+      // Loop through each key-value pair in the resource map
+      for (const [key, resourceId] of Object.entries(resourceMap)) {
+        log.info(`Processing resource key '${key}' with ID: ${resourceId}`);
         
         for (const dateStr of dates) {
           const url = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&filters=%7B%22uen_issue_date%22%3A%22${dateStr}%22%7D`;
           
           try {
-            log.info(`Fetching data for resource ${resourceId} on ${dateStr}`);
+            log.info(`Fetching data for resource key '${key}' (${resourceId}) on ${dateStr}`);
             
             const response = await fetch(url);
             
@@ -113,10 +86,11 @@ async function main() {
             
             // Check if there are records in the response
             const records = data.result?.records || [];
-            log.info(`Found ${records.length} records for resource ${resourceId} on ${dateStr}`);
+            log.info(`Found ${records.length} records for resource key '${key}' on ${dateStr}`);
             
             // Store data in Apify dataset
             const record = {
+              resourceKey: key,
               resourceId,
               date: dateStr,
               data,
@@ -126,10 +100,10 @@ async function main() {
             
             await dataset.pushData(record);
             totalRecords += records.length;
-            log.info(`Successfully stored data for resource ${resourceId} on ${dateStr} (${records.length} records)`);
+            log.info(`Successfully stored data for resource key '${key}' on ${dateStr} (${records.length} records)`);
             
           } catch (error) {
-            log.error(`Error fetching data for resource ${resourceId} on ${dateStr}:`, error);
+            log.error(`Error fetching data for resource key '${key}' on ${dateStr}:`, error);
             // Continue with next iteration instead of stopping
           }
         }
