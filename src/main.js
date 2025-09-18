@@ -1,11 +1,6 @@
 import { Actor, log } from 'apify';
 import { Dataset } from 'crawlee';
 
-// Debug: Check what we're importing
-console.log('Actor object:', Actor);
-console.log('Actor type:', typeof Actor);
-console.log('log object:', log);
-
 // Main execution function
 async function main() {
   // Initialize the Actor first
@@ -40,6 +35,11 @@ async function main() {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
+    // Check if dates are valid
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new Error('Invalid date format. Please use YYYY-MM-DD format');
+    }
+
     if (start > end) {
       throw new Error('startDate must be before or equal to endDate');
     }
@@ -52,11 +52,14 @@ async function main() {
       const current = new Date(startDate);
       const end = new Date(endDate);
       
+      log.info(`Date range generation - Start: ${current.toISOString()}, End: ${end.toISOString()}`);
+      
       while (current <= end) {
         dates.push(current.toISOString().split('T')[0]);
         current.setDate(current.getDate() + 1);
       }
       
+      log.info(`Generated dates: ${dates.slice(0, 5).join(', ')}${dates.length > 5 ? '...' : ''}`);
       return dates;
     };
 
