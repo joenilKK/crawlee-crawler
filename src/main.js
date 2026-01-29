@@ -21,7 +21,7 @@ async function main() {
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    const fetchWithRetry = async (url, maxRetries = 3) => {
+    const fetchWithRetry = async (url, maxRetries = 10) => {
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
           const response = await fetch(url);
