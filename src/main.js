@@ -21,6 +21,43 @@ async function main() {
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+    const fetchWithRetry = async (url, maxRetries = 3) => {
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await fetch(url);
+          
+          if (response.status === 429) {
+            const retryAfter = response.headers.get('Retry-After');
+            const waitTime = retryAfter 
+              ? parseInt(retryAfter) * 1000 
+              : requestDelayMs * Math.pow(2, attempt); // exponential backoff
+            
+            if (attempt < maxRetries) {
+              log.warning(`Rate limited (429) on attempt ${attempt + 1}/${maxRetries + 1}. Waiting ${waitTime}ms before retry...`);
+              await sleep(waitTime);
+              continue;
+            } else {
+              throw new Error(`HTTP 429 after ${maxRetries + 1} attempts`);
+            }
+          }
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          return await response.json();
+        } catch (error) {
+          if (attempt === maxRetries) {
+            throw error;
+          }
+          // For other errors, wait before retry
+          const waitTime = requestDelayMs * Math.pow(2, attempt);
+          log.warning(`Request failed on attempt ${attempt + 1}/${maxRetries + 1}: ${error.message}. Waiting ${waitTime}ms before retry...`);
+          await sleep(waitTime);
+        }
+      }
+    };
+
     // Validate date format (YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
@@ -88,15 +125,12 @@ async function main() {
             const url = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&fields=uen%2Cuen_issue_date%2C+registration_incorporation_date%2C+entity_name%2Caddress_type%2Cbuilding_name%2Cstreet_name%2Cprimary_ssic_code%2Csecondary_ssic_code%2Cblock%2Clevel_no%2Cunit_no%2Cpostal_code%2Centity_type_description%2Cbusiness_constitution_description%2Ccompany_type_description%2Centity_status_description&filters=%7B%22uen_issue_date%22%3A%22${dateStr}%22%2C%22${ssicConfig.type}%22%3A%22${ssicConfig.value}%22%7D`;
             
             try {
+              // Add delay before each request to avoid hitting rate limits
+              await sleep(requestDelayMs);
+              
               log.info(`Fetching data for resource ${i + 1} (${resourceId}) on ${dateStr} with ${ssicConfig.type}`);
               
-              const response = await fetch(url);
-              
-              if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-              }
-              
-              const data = await response.json();
+              const data = await fetchWithRetry(url);
               
               // Check if there are records in the response
               const records = data.result?.records || [];
@@ -125,10 +159,10 @@ async function main() {
               
               log.info(`Successfully stored ${records.length} records for resource ${i + 1} on ${dateStr} with ${ssicConfig.type} (${duplicateRecords} duplicates skipped)`);
               
-              await sleep(requestDelayMs);
             } catch (error) {
-              log.error(`Error fetching data for resource ${i + 1} on ${dateStr} with ${ssicConfig.type}:`, error);
-              await sleep(requestDelayMs); // delay after error too (e.g. 429) before next request
+              log.error(`Error fetching data for resource ${i + 1} on ${dateStr} with ${ssicConfig.type}: ${error.message || error}`);
+              // Additional delay after error before continuing to next request
+              await sleep(requestDelayMs * 2);
             }
           }
         }
