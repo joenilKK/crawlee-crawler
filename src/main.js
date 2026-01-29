@@ -35,11 +35,13 @@ async function main() {
   Actor.on('migrating', async () => {
     log.info('Actor is migrating, saving state...');
     await saveState();
+    log.info('State saved successfully during migration');
   });
 
   Actor.on('aborting', async () => {
     log.info('Actor is aborting, saving state...');
     await saveState();
+    log.info('State saved successfully during abort');
   });
 
   // Also save state periodically (every 30 seconds)
@@ -50,8 +52,25 @@ async function main() {
   try {
     log.info('Actor initialized successfully');
 
-    // Load previous state if exists
-    const previousState = await Actor.getValue(STATE_KEY);
+    // Check if this is a migrated run
+    const isMigrated = process.env.APIFY_IS_AT_HOME === undefined || process.env.APIFY_MIGRATING === '1';
+    
+    // Load previous state if exists (with retry for resurrection/migration scenarios)
+    let previousState = null;
+    const maxAttempts = isMigrated ? 5 : 3;
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      previousState = await Actor.getValue(STATE_KEY);
+      if (previousState) {
+        log.info('State loaded successfully');
+        break;
+      }
+      if (attempt < maxAttempts - 1) {
+        log.info(`State not found on attempt ${attempt + 1}/${maxAttempts}, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    }
+    
     if (previousState) {
       state = previousState;
       log.info('Resuming from previous state:', {
