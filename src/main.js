@@ -1,9 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Actor } from 'apify';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const isApify = !!process.env.APIFY_IS_AT_HOME;
 
 // Simple logger
 const log = {
@@ -17,18 +20,21 @@ async function main() {
   try {
     log.info('Starting local execution');
 
-    // Get input from local file or use default
+    // Get input: Apify Actor input when on Apify, else local file or default
     let input;
-    const inputPath = path.join(__dirname, '..', 'input.json');
-    
-    if (fs.existsSync(inputPath)) {
-      const inputData = fs.readFileSync(inputPath, 'utf8');
-      input = JSON.parse(inputData);
-      log.info('Loaded input from input.json');
+    if (isApify) {
+      input = await Actor.getInput();
+      if (!input) throw new Error('Actor input is required on Apify');
+      log.info('Loaded input from Apify Actor');
     } else {
-      // Default input for local testing
-      input = {
-        resourceIds: [
+      const inputPath = path.join(__dirname, '..', 'input.json');
+      if (fs.existsSync(inputPath)) {
+        const inputData = fs.readFileSync(inputPath, 'utf8');
+        input = JSON.parse(inputData);
+        log.info('Loaded input from input.json');
+      } else {
+        input = {
+          resourceIds: [
           'd_8575e84912df3c28995b8e6e0e05205a',
           'd_3a3807c023c61ddfba947dc069eb53f2',
           'd_c0650f23e94c42e7a20921f4c5b75c24',
@@ -56,11 +62,12 @@ async function main() {
           'd_1cd970d8351b42be4a308d628a6dd9d3',
           'd_31af23fdb79119ed185c256f03cb5773',
           'd_4e3db8955fdcda6f9944097bef3d2724'
-        ], // Replace with actual resource IDs
+        ],
         startDate: '2025-10-01',
         endDate: '2025-10-31'
       };
-      log.info('Using default input (create input.json to customize)');
+        log.info('Using default input (create input.json to customize)');
+      }
     }
     
     // Extract resourceIds, startDate and endDate from input
@@ -269,6 +276,7 @@ async function main() {
                   ssic_source: ssicConfig.type
                 };
                 allRecords.push(recordWithSource);
+                if (isApify) await Actor.pushData(recordWithSource);
                 totalRecords++;
                 newRecords++;
                 resourceRecords++;
@@ -307,10 +315,13 @@ async function main() {
       log.info(`  Total requests made: ${requestCount}/${totalRequests}`);
       log.info(`  Output file: ${outputPath}`);
       log.info('='.repeat(60));
-      
-      // Save all records to output file
-      fs.writeFileSync(outputPath, JSON.stringify(allRecords, null, 2), 'utf8');
-      log.info(`Results saved successfully to ${outputPath}`);
+
+      if (isApify) {
+        log.info('Results pushed to Apify dataset (saved incrementally)');
+      } else {
+        fs.writeFileSync(outputPath, JSON.stringify(allRecords, null, 2), 'utf8');
+        log.info(`Results saved successfully to ${outputPath}`);
+      }
     };
 
     // Run the main function
