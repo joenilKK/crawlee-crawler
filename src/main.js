@@ -18,8 +18,8 @@ async function main() {
     duplicateRecords: 0,
   };
 
-  // Listen for persistState event (fired every 60s and before migration)
-  Actor.on('persistState', async () => {
+  // Save state function
+  const saveState = async () => {
     log.info('Persisting state...', {
       ssicIndex: state.ssicIndex,
       resourceIndex: state.resourceIndex,
@@ -30,7 +30,16 @@ async function main() {
     });
     await Actor.setValue(STATE_KEY, state);
     log.info('State persisted successfully');
-  });
+  };
+
+  // Listen for persistState event (fired every 60s and before migration)
+  Actor.on('persistState', saveState);
+
+  // Listen for aborting event to save state on graceful abort
+  Actor.on('aborting', saveState);
+
+  // Listen for migrating event to save state before migration
+  Actor.on('migrating', saveState);
 
   try {
     log.info('Actor initialized successfully');
