@@ -18,9 +18,9 @@ async function main() {
     duplicateRecords: 0,
   };
 
-  // Save state function
-  const saveState = async () => {
-    log.info('Saving state...', {
+  // Listen for persistState event (fired every 60s and before migration)
+  Actor.on('persistState', async () => {
+    log.info('Persisting state...', {
       ssicIndex: state.ssicIndex,
       resourceIndex: state.resourceIndex,
       dateIndex: state.dateIndex,
@@ -29,47 +29,14 @@ async function main() {
       duplicateRecords: state.duplicateRecords,
     });
     await Actor.setValue(STATE_KEY, state);
-  };
-
-  // Listen for migration and aborting events to persist state
-  Actor.on('migrating', async () => {
-    log.info('Actor is migrating, saving state...');
-    await saveState();
-    log.info('State saved successfully during migration');
+    log.info('State persisted successfully');
   });
-
-  Actor.on('aborting', async () => {
-    log.info('Actor is aborting, saving state...');
-    await saveState();
-    log.info('State saved successfully during abort');
-  });
-
-  // Also save state periodically (every 30 seconds)
-  const stateInterval = setInterval(async () => {
-    await saveState();
-  }, 30000);
 
   try {
     log.info('Actor initialized successfully');
 
-    // Check if this is a migrated run
-    const isMigrated = process.env.APIFY_IS_AT_HOME === undefined || process.env.APIFY_MIGRATING === '1';
-    
-    // Load previous state if exists (with retry for resurrection/migration scenarios)
-    let previousState = null;
-    const maxAttempts = isMigrated ? 5 : 3;
-    
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      previousState = await Actor.getValue(STATE_KEY);
-      if (previousState) {
-        log.info('State loaded successfully');
-        break;
-      }
-      if (attempt < maxAttempts - 1) {
-        log.info(`State not found on attempt ${attempt + 1}/${maxAttempts}, retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      }
-    }
+    // Load previous state from key-value store if it exists
+    const previousState = await Actor.getValue(STATE_KEY);
     
     if (previousState) {
       state = previousState;
@@ -288,10 +255,11 @@ async function main() {
     
   } catch (error) {
     log.error('Fatal error in main execution:', error);
-    await saveState(); // Save state on error
+    // Save state on error
+    await Actor.setValue(STATE_KEY, state);
+    log.info('State saved after error');
     throw error;
   } finally {
-    clearInterval(stateInterval);
     log.info('Exiting Actor...');
     await Actor.exit();
   }
