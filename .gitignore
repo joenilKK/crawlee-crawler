@@ -87,6 +87,7 @@ storage/
 !.actor/actor.json
 !package.json
 !package-lock.json
+apify-state-reference.js
 
 # Backup files
 *_backup_*

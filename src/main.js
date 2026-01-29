@@ -1,13 +1,10 @@
 import { Actor, log } from 'apify';
 import { Dataset } from 'crawlee';
 
-const STATE_KEY = 'CRAWLER_STATE';
+const STATE_KEY = 'STATE';
 
 // Main execution function
 async function main() {
-  // Initialize the Actor first
-  await Actor.init();
-  
   // State object that will be persisted
   let state = {
     ssicIndex: 0,
@@ -18,47 +15,28 @@ async function main() {
     duplicateRecords: 0,
   };
 
-  // Save state function
-  const saveState = async () => {
-    log.info('Persisting state...', {
-      ssicIndex: state.ssicIndex,
-      resourceIndex: state.resourceIndex,
-      dateIndex: state.dateIndex,
-      processedUENsCount: state.processedUENs.length,
-      totalRecords: state.totalRecords,
-      duplicateRecords: state.duplicateRecords,
-    });
-    await Actor.setValue(STATE_KEY, state);
-    log.info('State persisted successfully');
-  };
-
-  // Listen for persistState event (fired every 60s and before migration)
-  Actor.on('persistState', saveState);
-
-  // Listen for aborting event to save state on graceful abort
-  Actor.on('aborting', saveState);
-
-  // Listen for migrating event to save state before migration
-  Actor.on('migrating', saveState);
-
   try {
     log.info('Actor initialized successfully');
 
     // Load previous state from key-value store if it exists
-    const previousState = await Actor.getValue(STATE_KEY);
-    
-    if (previousState) {
-      state = previousState;
-      log.info('Resuming from previous state:', {
-        ssicIndex: state.ssicIndex,
-        resourceIndex: state.resourceIndex,
-        dateIndex: state.dateIndex,
-        processedUENsCount: state.processedUENs.length,
-        totalRecords: state.totalRecords,
-        duplicateRecords: state.duplicateRecords,
-      });
+    if (Actor.isAtHome()) {
+      const previousState = await Actor.getValue(STATE_KEY);
+      
+      if (previousState) {
+        state = previousState;
+        log.info('Resuming from previous state:', {
+          ssicIndex: state.ssicIndex,
+          resourceIndex: state.resourceIndex,
+          dateIndex: state.dateIndex,
+          processedUENsCount: state.processedUENs.length,
+          totalRecords: state.totalRecords,
+          duplicateRecords: state.duplicateRecords,
+        });
+      } else {
+        log.info('No previous state found, starting fresh');
+      }
     } else {
-      log.info('No previous state found, starting fresh');
+      log.info('Running locally, starting fresh');
     }
 
     // Get input from Actor
@@ -237,6 +215,11 @@ async function main() {
               
               log.info(`Successfully stored ${records.length} records for resource ${i + 1} on ${dateStr} with ${ssicConfig.type} (${duplicateRecords} duplicates skipped)`);
               
+              // Save state after each successful date fetch
+              if (Actor.isAtHome()) {
+                await Actor.setValue(STATE_KEY, state);
+              }
+              
             } catch (error) {
               log.error(`Error fetching data for resource ${i + 1} on ${dateStr} with ${ssicConfig.type}: ${error.message || error}`);
               // Additional delay after error before continuing to next request
@@ -259,23 +242,75 @@ async function main() {
     log.info('Data fetching completed successfully');
     
     // Clear state on successful completion
-    await Actor.setValue(STATE_KEY, null);
-    log.info('Cleared state after successful completion');
+    if (Actor.isAtHome()) {
+      await Actor.setValue(STATE_KEY, null);
+      log.info('Cleared state after successful completion');
+    }
     
   } catch (error) {
     log.error('Fatal error in main execution:', error);
     // Save state on error
-    await Actor.setValue(STATE_KEY, state);
-    log.info('State saved after error');
+    if (Actor.isAtHome()) {
+      await Actor.setValue(STATE_KEY, state);
+      log.info('State saved after error');
+    }
     throw error;
-  } finally {
-    log.info('Exiting Actor...');
-    await Actor.exit();
   }
 }
 
 // Execute the main function
-main().catch((error) => {
-  console.error('Unhandled error:', error);
-  process.exit(1);
-});
+if (Actor.isAtHome()) {
+  // When running on the Apify platform
+  Actor.main(async () => {
+    try {
+      // Initialize the Actor
+      await Actor.init();
+
+      // Set up event handlers for migration and abort BEFORE running main
+      Actor.on('migrating', async () => {
+        log.info('Migration event detected, saving state...');
+        // Get the latest state from key-value store
+        const currentState = await Actor.getValue(STATE_KEY);
+        if (currentState) {
+          currentState.lastEvent = {
+            type: 'migration',
+            timestamp: new Date().toISOString()
+          };
+          await Actor.setValue(STATE_KEY, currentState);
+          log.info('State saved during migration');
+        }
+      });
+
+      Actor.on('aborting', async () => {
+        log.info('Abort event detected, saving state...');
+        // Get the latest state from key-value store
+        const currentState = await Actor.getValue(STATE_KEY);
+        if (currentState) {
+          currentState.lastEvent = {
+            type: 'abort',
+            timestamp: new Date().toISOString()
+          };
+          await Actor.setValue(STATE_KEY, currentState);
+          log.info('State saved during abort');
+        }
+      });
+
+      await main();
+    } catch (error) {
+      log.error('Error during execution:', error);
+      throw error;
+    } finally {
+      await Actor.exit();
+    }
+  });
+} else {
+  // When running locally
+  try {
+    await Actor.init();
+    await main();
+    await Actor.exit();
+  } catch (error) {
+    log.error('Error during execution:', error);
+    process.exit(1);
+  }
+}
