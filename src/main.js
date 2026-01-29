@@ -1,13 +1,70 @@
 import { Actor, log } from 'apify';
 import { Dataset } from 'crawlee';
 
+const STATE_KEY = 'CRAWLER_STATE';
+
 // Main execution function
 async function main() {
   // Initialize the Actor first
   await Actor.init();
   
+  // State object that will be persisted
+  let state = {
+    ssicIndex: 0,
+    resourceIndex: 0,
+    dateIndex: 0,
+    processedUENs: [],
+    totalRecords: 0,
+    duplicateRecords: 0,
+  };
+
+  // Save state function
+  const saveState = async () => {
+    log.info('Saving state...', {
+      ssicIndex: state.ssicIndex,
+      resourceIndex: state.resourceIndex,
+      dateIndex: state.dateIndex,
+      processedUENsCount: state.processedUENs.length,
+      totalRecords: state.totalRecords,
+      duplicateRecords: state.duplicateRecords,
+    });
+    await Actor.setValue(STATE_KEY, state);
+  };
+
+  // Listen for migration and aborting events to persist state
+  Actor.on('migrating', async () => {
+    log.info('Actor is migrating, saving state...');
+    await saveState();
+  });
+
+  Actor.on('aborting', async () => {
+    log.info('Actor is aborting, saving state...');
+    await saveState();
+  });
+
+  // Also save state periodically (every 30 seconds)
+  const stateInterval = setInterval(async () => {
+    await saveState();
+  }, 30000);
+
   try {
     log.info('Actor initialized successfully');
+
+    // Load previous state if exists
+    const previousState = await Actor.getValue(STATE_KEY);
+    if (previousState) {
+      state = previousState;
+      log.info('Resuming from previous state:', {
+        ssicIndex: state.ssicIndex,
+        resourceIndex: state.resourceIndex,
+        dateIndex: state.dateIndex,
+        processedUENsCount: state.processedUENs.length,
+        totalRecords: state.totalRecords,
+        duplicateRecords: state.duplicateRecords,
+      });
+    } else {
+      log.info('No previous state found, starting fresh');
+    }
 
     // Get input from Actor
     const input = await Actor.getInput();
@@ -102,9 +159,11 @@ async function main() {
 
     const fetchAllData = async () => {
       const dataset = await Dataset.open();
-      let totalRecords = 0;
-      let duplicateRecords = 0;
-      const processedUENs = new Set(); // Track processed UENs to prevent duplicates
+      
+      // Restore counters and processedUENs from state
+      let totalRecords = state.totalRecords;
+      let duplicateRecords = state.duplicateRecords;
+      const processedUENs = new Set(state.processedUENs); // Restore from array
       
       // Define SSIC codes to process
       const ssicCodes = [
@@ -112,16 +171,35 @@ async function main() {
         { type: 'secondary_ssic_code', value: ssic }
       ];
       
-      // Loop through each SSIC code type
-      for (const ssicConfig of ssicCodes) {
+      // Store initial resume positions
+      const resumeSsicIdx = state.ssicIndex;
+      const resumeResourceIdx = state.resourceIndex;
+      const resumeDateIdx = state.dateIndex;
+      
+      // Loop through each SSIC code type (resume from state.ssicIndex)
+      for (let ssicIdx = resumeSsicIdx; ssicIdx < ssicCodes.length; ssicIdx++) {
+        const ssicConfig = ssicCodes[ssicIdx];
+        state.ssicIndex = ssicIdx;
+        
         log.info(`Processing ${ssicConfig.type} with value ${ssicConfig.value}`);
         
-        // Loop through each resource ID
-        for (let i = 0; i < resourceIds.length; i++) {
+        // Determine starting resource index (only use state value on first ssic iteration)
+        const startResourceIdx = ssicIdx === resumeSsicIdx ? resumeResourceIdx : 0;
+        
+        // Loop through each resource ID (resume from state.resourceIndex)
+        for (let i = startResourceIdx; i < resourceIds.length; i++) {
           const resourceId = resourceIds[i];
+          state.resourceIndex = i;
+          
           log.info(`Processing resource ${i + 1}/${resourceIds.length}: ${resourceId} for ${ssicConfig.type}`);
           
-          for (const dateStr of dates) {
+          // Determine starting date index (only use state value on first resource iteration)
+          const startDateIdx = (ssicIdx === resumeSsicIdx && i === resumeResourceIdx) ? resumeDateIdx : 0;
+          
+          for (let dateIdx = startDateIdx; dateIdx < dates.length; dateIdx++) {
+            const dateStr = dates[dateIdx];
+            state.dateIndex = dateIdx;
+            
             const url = `https://data.gov.sg/api/action/datastore_search?resource_id=${resourceId}&fields=uen%2Cuen_issue_date%2C+registration_incorporation_date%2C+entity_name%2Caddress_type%2Cbuilding_name%2Cstreet_name%2Cprimary_ssic_code%2Csecondary_ssic_code%2Cblock%2Clevel_no%2Cunit_no%2Cpostal_code%2Centity_type_description%2Cbusiness_constitution_description%2Ccompany_type_description%2Centity_status_description&filters=%7B%22uen_issue_date%22%3A%22${dateStr}%22%2C%22${ssicConfig.type}%22%3A%22${ssicConfig.value}%22%7D`;
             
             try {
@@ -143,6 +221,7 @@ async function main() {
                 // Check if this UEN has already been processed
                 if (processedUENs.has(uen)) {
                   duplicateRecords++;
+                  state.duplicateRecords = duplicateRecords;
                   log.debug(`Skipping duplicate record for UEN: ${uen} (${record.entity_name})`);
                   continue;
                 }
@@ -155,6 +234,10 @@ async function main() {
                 };
                 await dataset.pushData(recordWithSource);
                 totalRecords++;
+                
+                // Update state
+                state.totalRecords = totalRecords;
+                state.processedUENs = Array.from(processedUENs);
               }
               
               log.info(`Successfully stored ${records.length} records for resource ${i + 1} on ${dateStr} with ${ssicConfig.type} (${duplicateRecords} duplicates skipped)`);
@@ -165,7 +248,11 @@ async function main() {
               await sleep(requestDelayMs * 2);
             }
           }
+          // Reset date index when moving to next resource
+          state.dateIndex = 0;
         }
+        // Reset resource index when moving to next SSIC type
+        state.resourceIndex = 0;
       }
       
       log.info(`Total unique records processed: ${totalRecords}`);
@@ -176,10 +263,16 @@ async function main() {
     await fetchAllData();
     log.info('Data fetching completed successfully');
     
+    // Clear state on successful completion
+    await Actor.setValue(STATE_KEY, null);
+    log.info('Cleared state after successful completion');
+    
   } catch (error) {
     log.error('Fatal error in main execution:', error);
+    await saveState(); // Save state on error
     throw error;
   } finally {
+    clearInterval(stateInterval);
     log.info('Exiting Actor...');
     await Actor.exit();
   }
