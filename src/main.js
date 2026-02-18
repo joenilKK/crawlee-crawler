@@ -77,6 +77,7 @@ const crawler = new PlaywrightCrawler({
         email,
         address,
         language,
+        dateDiscovered: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       };
 
 
