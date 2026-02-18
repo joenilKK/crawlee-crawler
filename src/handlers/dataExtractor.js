@@ -10,7 +10,11 @@
  */
 export async function extractDoctorName(page, config) {
     try {
-        await page.waitForSelector(config.SELECTORS.doctorName, { timeout: 10000 });
+        // Wait for selector without requiring visibility (elements might be hidden on mobile view)
+        await page.waitForSelector(config.SELECTORS.doctorName, { 
+            timeout: 10000,
+            state: 'attached' // Wait for element to be in DOM, not necessarily visible
+        });
         
         const doctorName = await page.evaluate((selector) => {
             const nameElement = document.querySelector(selector);
@@ -33,7 +37,11 @@ export async function extractDoctorName(page, config) {
  */
 export async function extractSpecialty(page, config) {
     try {
-        await page.waitForSelector(config.SELECTORS.specialty, { timeout: 10000 });
+        // Wait for selector without requiring visibility (elements might be hidden on mobile view)
+        await page.waitForSelector(config.SELECTORS.specialty, { 
+            timeout: 10000,
+            state: 'attached' // Wait for element to be in DOM, not necessarily visible
+        });
         
         const specialties = await page.evaluate((selector) => {
             const specialtyElements = document.querySelectorAll(selector);
