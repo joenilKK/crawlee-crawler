@@ -5,6 +5,9 @@
 import fs from 'fs';
 import path from 'path';
 
+// Counter for individual file saves
+let fileCounter = 0;
+
 /**
  * Save extracted data to JSON file
  * @param {Array} extractedData - Array of specialist data
@@ -88,5 +91,61 @@ export function createBackupIfExists(filename, config) {
         } catch (error) {
             console.error('Error creating backup:', error);
         }
+    }
+}
+
+/**
+ * Save individual result to separate JSON file (Apify-style)
+ * @param {Object} result - Single result object
+ * @param {Object} config - Configuration object
+ * @returns {Promise<string>} File path where data was saved
+ */
+export async function saveIndividualResult(result, config) {
+    // Create output directory if it doesn't exist
+    const outputDir = path.join(process.cwd(), 'storage', 'datasets', 'default');
+    
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+    }
+    
+    // Increment counter and format with leading zeros
+    fileCounter++;
+    const filename = String(fileCounter).padStart(5, '0') + '.json';
+    const filepath = path.join(outputDir, filename);
+    
+    try {
+        fs.writeFileSync(filepath, JSON.stringify(result, null, 2), 'utf8');
+        console.log(`💾 Saved: ${filename}`);
+        return filepath;
+    } catch (error) {
+        console.error(`Error saving individual result to ${filename}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Reset file counter (useful when starting a new crawl)
+ */
+export function resetFileCounter() {
+    // Check existing files and start from the next number
+    const outputDir = path.join(process.cwd(), 'storage', 'datasets', 'default');
+    
+    if (fs.existsSync(outputDir)) {
+        const files = fs.readdirSync(outputDir)
+            .filter(f => f.match(/^\d{5}\.json$/))
+            .sort();
+        
+        if (files.length > 0) {
+            const lastFile = files[files.length - 1];
+            const lastNumber = parseInt(lastFile.replace('.json', ''), 10);
+            fileCounter = lastNumber;
+            console.log(`📊 Continuing from file number: ${fileCounter}`);
+        } else {
+            fileCounter = 0;
+            console.log(`📊 Starting fresh - no existing files found`);
+        }
+    } else {
+        fileCounter = 0;
+        console.log(`📊 Creating new output directory`);
     }
 }

@@ -174,17 +174,84 @@ export async function extractSpecialistData(page, url, config) {
         const specialty = await extractSpecialty(page, config);
         const contactDetails = await extractContactDetails(page, config);
         
+        // Flatten the structure - extract contact info directly
         const specialistData = {
             url: url,
             doctorName: doctorName,
-            specialty: specialty,
-            contactDetails: contactDetails,
+            specialty: Array.isArray(specialty) ? specialty.join(', ') : specialty,
             extractedAt: new Date().toISOString()
         };
         
+        // Categorize contact details by type
+        const phones = [];
+        const emails = [];
+        const websites = [];
+        const addresses = [];
+        
+        contactDetails.forEach((contact) => {
+            const link = contact.link || '';
+            const text = contact.text || '';
+            
+            if (link.startsWith('tel:')) {
+                phones.push(text);
+            } else if (link.startsWith('mailto:')) {
+                emails.push(text);
+            } else if (link.startsWith('http') && text.startsWith('http')) {
+                // Pure website link
+                websites.push(link);
+            } else if (link.startsWith('http') || link.startsWith('/')) {
+                // Address with link (clinic location)
+                addresses.push({ text: text, link: link });
+            } else {
+                // Fallback - treat as address if it has substantial text
+                if (text.length > 20) {
+                    addresses.push({ text: text, link: link });
+                }
+            }
+        });
+        
+        // Add categorized contact info as flat fields
+        if (phones.length === 1) {
+            specialistData.tel = phones[0];
+        } else {
+            phones.forEach((phone, index) => {
+                specialistData[`tel_${index + 1}`] = phone;
+            });
+        }
+        
+        if (emails.length === 1) {
+            specialistData.email = emails[0];
+        } else {
+            emails.forEach((email, index) => {
+                specialistData[`email_${index + 1}`] = email;
+            });
+        }
+        
+        if (websites.length === 1) {
+            specialistData.website = websites[0];
+        } else {
+            websites.forEach((website, index) => {
+                specialistData[`website_${index + 1}`] = website;
+            });
+        }
+        
+        if (addresses.length === 1) {
+            specialistData.address = addresses[0].text;
+            if (addresses[0].link) {
+                specialistData.address_link = addresses[0].link;
+            }
+        } else {
+            addresses.forEach((address, index) => {
+                specialistData[`address_${index + 1}`] = address.text;
+                if (address.link) {
+                    specialistData[`address_${index + 1}_link`] = address.link;
+                }
+            });
+        }
+        
         console.log(`Extracted data for: ${doctorName}`);
         console.log(`Specialty found: ${specialty}`);
-        console.log(`Contact details found: ${contactDetails.length}`);
+        console.log(`Contact details found: ${contactDetails.length} (${phones.length} phones, ${emails.length} emails, ${websites.length} websites, ${addresses.length} addresses)`);
         
         return specialistData;
         
@@ -194,7 +261,6 @@ export async function extractSpecialistData(page, url, config) {
         return {
             url: url,
             doctorName: 'Extraction failed',
-            contactDetails: [],
             error: error.message,
             extractedAt: new Date().toISOString()
         };
@@ -214,8 +280,7 @@ export async function extractCustomData(page, url, customSelectors = {}) {
     const extractedData = {
         url: url,
         title: await page.title(),
-        extractedAt: new Date().toISOString(),
-        data: {}
+        extractedAt: new Date().toISOString()
     };
     
     try {
@@ -224,17 +289,13 @@ export async function extractCustomData(page, url, customSelectors = {}) {
                 // Handle nested structure for links
                 if (Array.isArray(selectorConfig)) {
                     console.log(`🔗 Processing nested selectors for ${fieldName}`);
-                    const nestedResults = [];
                     
                     for (const linkConfig of selectorConfig) {
                         if (typeof linkConfig === 'object' && linkConfig !== null) {
-                            const linkData = {};
-                            
                             for (const [linkName, linkSelector] of Object.entries(linkConfig)) {
                                 try {
-                                    let dataType = 'link'; // Default to link for nested structures
+                                    let dataType = 'link';
                                     
-                                    // Override data type based on field name
                                     if (linkName.toLowerCase().includes('image') || linkName.toLowerCase().includes('img')) {
                                         dataType = 'image';
                                     } else if (linkName.toLowerCase().includes('text') || linkName.toLowerCase().includes('title')) {
@@ -242,25 +303,22 @@ export async function extractCustomData(page, url, customSelectors = {}) {
                                     }
                                     
                                     const result = await extractWithFallback(page, linkSelector, dataType);
-                                    linkData[linkName] = result;
+                                    
+                                    // Flatten: add directly to extractedData
+                                    const flatKey = `${fieldName}_${linkName}`;
+                                    extractedData[flatKey] = Array.isArray(result) ? result.join(', ') : result;
                                     
                                     console.log(`  ✅ Extracted ${linkName}: ${Array.isArray(result) ? result.length + ' items' : 'data found'}`);
                                 } catch (error) {
                                     console.log(`  ❌ Error extracting ${linkName}:`, error.message);
-                                    linkData[linkName] = null;
+                                    extractedData[`${fieldName}_${linkName}`] = null;
                                 }
                             }
-                            
-                            nestedResults.push(linkData);
                         }
                     }
-                    
-                    extractedData.data[fieldName] = nestedResults;
                 } else if (typeof selectorConfig === 'string') {
-                    // Handle simple string selectors (existing functionality)
                     let dataType = 'text';
                     
-                    // Determine data type based on field name
                     if (fieldName.toLowerCase().includes('image') || fieldName.toLowerCase().includes('img')) {
                         dataType = 'image';
                     } else if (fieldName.toLowerCase().includes('link') || fieldName.toLowerCase().includes('url')) {
@@ -270,36 +328,23 @@ export async function extractCustomData(page, url, customSelectors = {}) {
                     const result = await extractWithFallback(page, selectorConfig, dataType);
                     
                     if (result !== null) {
-                        extractedData.data[fieldName] = result;
+                        // Flatten arrays to string
+                        extractedData[fieldName] = Array.isArray(result) ? result.map(r => typeof r === 'object' ? JSON.stringify(r) : r).join(', ') : result;
                         console.log(`✅ Extracted ${fieldName}: ${Array.isArray(result) ? result.length + ' items' : 'data found'}`);
                     } else {
                         console.log(`⚠️ No data found for ${fieldName} with selector: ${selectorConfig}`);
-                        extractedData.data[fieldName] = null;
+                        extractedData[fieldName] = null;
                     }
                 } else {
                     console.log(`⚠️ Unsupported selector configuration for ${fieldName}`);
-                    extractedData.data[fieldName] = null;
+                    extractedData[fieldName] = null;
                 }
                 
             } catch (error) {
                 console.log(`❌ Error extracting ${fieldName}:`, error.message);
-                extractedData.data[fieldName] = null;
+                extractedData[fieldName] = null;
             }
         }
-        
-        // Extract page metadata
-        extractedData.meta = await page.evaluate(() => {
-            const meta = {};
-            const metaTags = document.querySelectorAll('meta');
-            metaTags.forEach(tag => {
-                const name = tag.getAttribute('name') || tag.getAttribute('property') || tag.getAttribute('http-equiv');
-                const content = tag.getAttribute('content');
-                if (name && content) {
-                    meta[name] = content;
-                }
-            });
-            return meta;
-        });
         
         console.log(`✅ Successfully extracted custom data from: ${url}`);
         return extractedData;

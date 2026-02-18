@@ -3,9 +3,10 @@
  */
 
 import { PlaywrightCrawler } from 'crawlee';
-import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
+import { saveDataToFile, createBackupIfExists, resetFileCounter } from './handlers/fileHandler.js';
 import { extractCustomData } from './handlers/dataExtractor.js';
 import { extractDoctorData, extractDoctorDataFallback } from './handlers/doctorExtractor.js';
+import { saveResultImmediately } from './config/environment.js';
 
 
 /**
@@ -50,9 +51,11 @@ function convertCookiesToPlaywrightFormat(cookies) {
 /**
  * Run scraper-only mode
  * @param {Object} config - Configuration object
+ * @param {Object} Actor - Apify Actor instance (null for local)
+ * @param {boolean} isApify - Whether running in Apify
  * @returns {Promise<Array>} Array of extracted data
  */
-export async function runScraperOnly(config) {
+export async function runScraperOnly(config, Actor = null, isApify = false) {
     console.log('🎯 Starting scraper-only mode');
     console.log(`📝 URLs to scrape: ${config.SCRAPER?.urls?.length || 0}`);
     
@@ -61,6 +64,11 @@ export async function runScraperOnly(config) {
     }
     
     const extractedData = [];
+    
+    // Initialize file counter for local mode
+    if (!isApify) {
+        resetFileCounter();
+    }
     
     // Create backup of existing file if needed
     createBackupIfExists(config.OUTPUT.getFilename(), config);
@@ -117,9 +125,9 @@ export async function runScraperOnly(config) {
             
             
             // Check if user wants specialized doctor extraction or general custom extraction
-            let pageData;
+            let pageResults;
             
-            // Check if custom selectors contain doctor-specific fields (doctorName, position, phoneLinks)
+            // Check if custom selectors contain doctor-specific fields
             const hasDoctorFields = config.SCRAPER.customSelectors && (
                 config.SCRAPER.customSelectors.doctorName || 
                 config.SCRAPER.customSelectors.position || 
@@ -130,34 +138,41 @@ export async function runScraperOnly(config) {
             if (hasDoctorFields) {
                 console.log('🏥 Using specialized doctor extractor based on custom selectors');
                 
-                // Try the main doctor extractor first
-                pageData = await extractDoctorData(page, request.url, config.SCRAPER.customSelectors);
+                // Try the main doctor extractor first (returns array of flat objects)
+                pageResults = await extractDoctorData(page, request.url, config.SCRAPER.customSelectors);
                 
                 // If no doctors found, try the fallback method
-                if (pageData.doctors && pageData.doctors.length === 0) {
+                if (pageResults.length === 0) {
                     console.log('🔄 No doctors found with main extractor, trying fallback method');
-                    pageData = await extractDoctorDataFallback(page, request.url, config.SCRAPER.customSelectors);
+                    pageResults = await extractDoctorDataFallback(page, request.url, config.SCRAPER.customSelectors);
                 }
             } else {
                 console.log('🌐 Using general custom data extractor');
-                pageData = await extractCustomData(page, request.url, config.SCRAPER.customSelectors);
+                const pageData = await extractCustomData(page, request.url, config.SCRAPER.customSelectors);
+                pageResults = [pageData];
             }
             
-            extractedData.push(pageData);
+            // Save each result immediately (Apify-style)
+            for (const result of pageResults) {
+                extractedData.push(result);
+                await saveResultImmediately(result, Actor, isApify, config);
+            }
             
-            console.log(`✅ Completed scraping: ${request.url}`);
+            console.log(`✅ Completed scraping: ${request.url} (${pageResults.length} records)`);
         },
         
         failedRequestHandler: async ({ request, error }) => {
             console.error(`❌ Failed to scrape ${request.url}:`, error.message);
             
             // Add failed URL data with error
-            extractedData.push({
+            const failedResult = {
                 url: request.url,
                 error: error.message,
-                extractedAt: new Date().toISOString(),
-                data: null
-            });
+                extractedAt: new Date().toISOString()
+            };
+            
+            extractedData.push(failedResult);
+            await saveResultImmediately(failedResult, Actor, isApify, config);
         }
     });
     

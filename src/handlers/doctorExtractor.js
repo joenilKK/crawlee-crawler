@@ -12,12 +12,7 @@
 export async function extractDoctorData(page, url, customSelectors = {}) {
     console.log(`🏥 Extracting doctor data from: ${url}`);
     
-    const extractedData = {
-        url: url,
-        title: await page.title(),
-        extractedAt: new Date().toISOString(),
-        doctors: []
-    };
+    const allDoctors = [];
 
     try {
         // First, try to find doctor cards/containers
@@ -50,7 +45,6 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                         };
                         
                         // Find phone links that might be associated with this doctor
-                        // This is tricky without proper containers, so we'll try to find nearby phone links
                         const nearbyPhones = [];
                         
                         // Look for phone links near this name element
@@ -127,9 +121,6 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
             phoneLinks: customSelectors.phoneLinks || '.tel_number a, a[href^="tel:"], .phone a, .contact a'
         });
         
-        extractedData.doctors = doctors;
-        extractedData.totalDoctors = doctors.length;
-        
         console.log(`✅ Successfully extracted ${doctors.length} doctors from: ${url}`);
         
         // Log first few doctors for verification
@@ -140,12 +131,70 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
             });
         }
         
-        return extractedData;
+        // Flatten each doctor into a separate result
+        doctors.forEach(doctor => {
+            const flatDoctor = {
+                url: url,
+                name: doctor.name,
+                position: doctor.position,
+                extractedAt: new Date().toISOString()
+            };
+            
+            // Categorize phone links by type
+            const phones = [];
+            const emails = [];
+            const websites = [];
+            
+            doctor.links.forEach((link) => {
+                const href = link.href || '';
+                const text = link.text || '';
+                
+                if (href.startsWith('tel:')) {
+                    phones.push(text);
+                } else if (href.startsWith('mailto:')) {
+                    emails.push(text);
+                } else if (href.startsWith('http')) {
+                    websites.push(href);
+                }
+            });
+            
+            // Add categorized contact info as flat fields
+            if (phones.length === 1) {
+                flatDoctor.tel = phones[0];
+            } else {
+                phones.forEach((phone, index) => {
+                    flatDoctor[`tel_${index + 1}`] = phone;
+                });
+            }
+            
+            if (emails.length === 1) {
+                flatDoctor.email = emails[0];
+            } else {
+                emails.forEach((email, index) => {
+                    flatDoctor[`email_${index + 1}`] = email;
+                });
+            }
+            
+            if (websites.length === 1) {
+                flatDoctor.website = websites[0];
+            } else {
+                websites.forEach((website, index) => {
+                    flatDoctor[`website_${index + 1}`] = website;
+                });
+            }
+            
+            allDoctors.push(flatDoctor);
+        });
+        
+        return allDoctors;
         
     } catch (error) {
         console.error(`❌ Error extracting doctor data from ${url}:`, error);
-        extractedData.error = error.message;
-        return extractedData;
+        return [{
+            url: url,
+            error: error.message,
+            extractedAt: new Date().toISOString()
+        }];
     }
 }
 
@@ -159,6 +208,8 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
 export async function extractDoctorDataFallback(page, url, customSelectors = {}) {
     console.log(`🔄 Using fallback extraction method for: ${url}`);
     
+    const allDoctors = [];
+    
     try {
         // Try to extract by finding patterns in the page structure
         const doctors = await page.evaluate((selectors) => {
@@ -169,7 +220,7 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
             
             nameElements.forEach((nameEl, index) => {
                 const name = nameEl.textContent.trim();
-                if (!name || name.length < 3) return; // Skip empty or too short names
+                if (!name || name.length < 3) return;
                 
                 let position = '';
                 let links = [];
@@ -239,23 +290,70 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
             phoneLinks: customSelectors.phoneLinks || '.tel_number a, a[href^="tel:"], .phone a, .contact a'
         });
         
-        return {
-            url: url,
-            title: await page.title(),
-            extractedAt: new Date().toISOString(),
-            doctors: doctors,
-            totalDoctors: doctors.length,
-            extractionMethod: 'fallback'
-        };
+        // Flatten each doctor into a separate result
+        doctors.forEach(doctor => {
+            const flatDoctor = {
+                url: url,
+                name: doctor.name,
+                position: doctor.position,
+                extractedAt: new Date().toISOString(),
+                extractionMethod: 'fallback'
+            };
+            
+            // Categorize phone links by type
+            const phones = [];
+            const emails = [];
+            const websites = [];
+            
+            doctor.links.forEach((link) => {
+                const href = link.href || '';
+                const text = link.text || '';
+                
+                if (href.startsWith('tel:')) {
+                    phones.push(text);
+                } else if (href.startsWith('mailto:')) {
+                    emails.push(text);
+                } else if (href.startsWith('http')) {
+                    websites.push(href);
+                }
+            });
+            
+            // Add categorized contact info as flat fields
+            if (phones.length === 1) {
+                flatDoctor.tel = phones[0];
+            } else {
+                phones.forEach((phone, index) => {
+                    flatDoctor[`tel_${index + 1}`] = phone;
+                });
+            }
+            
+            if (emails.length === 1) {
+                flatDoctor.email = emails[0];
+            } else {
+                emails.forEach((email, index) => {
+                    flatDoctor[`email_${index + 1}`] = email;
+                });
+            }
+            
+            if (websites.length === 1) {
+                flatDoctor.website = websites[0];
+            } else {
+                websites.forEach((website, index) => {
+                    flatDoctor[`website_${index + 1}`] = website;
+                });
+            }
+            
+            allDoctors.push(flatDoctor);
+        });
+        
+        return allDoctors;
         
     } catch (error) {
         console.error(`❌ Fallback extraction failed for ${url}:`, error);
-        return {
+        return [{
             url: url,
             error: error.message,
-            extractedAt: new Date().toISOString(),
-            doctors: [],
-            totalDoctors: 0
-        };
+            extractedAt: new Date().toISOString()
+        }];
     }
 }

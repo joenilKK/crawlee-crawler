@@ -1,14 +1,13 @@
 import { PlaywrightCrawler } from 'crawlee';
 import { extractSpecialistData } from './handlers/dataExtractor.js';
-import { saveDataToFile, createBackupIfExists, resetFileCounter } from './handlers/fileHandler.js';
+import { saveDataToFile, createBackupIfExists } from './handlers/fileHandler.js';
 import { handlePagination, handleInitialPagination } from './handlers/paginationHandler.js';
 import { shouldCrawlUrl } from './utils/helpers.js';
 import { runScraperOnly } from './scraper-only.js';
 import { CONFIG } from './config/config.js';
 import { 
     getConfiguration, 
-    handleDataOutput,
-    saveResultImmediately,
+    handleDataOutput, 
     handleExit 
 } from './config/environment.js';
 
@@ -73,11 +72,6 @@ console.log('Starting crawler with configuration:', {
     scraperUrls: CONFIG.SCRAPER.urls.length
 });
 
-// Initialize file counter for local mode
-if (!isApify) {
-    resetFileCounter();
-}
-
 // Check for scraper-only mode first
 if (CONFIG.CRAWLER.scraperMode) {
     console.log('🎯 Scraper-only mode enabled - scraping specific URLs');
@@ -93,7 +87,7 @@ if (CONFIG.CRAWLER.scraperMode) {
         console.log(`   ${index + 1}. ${url}`);
     });
     
-    const extractedData = await runScraperOnly(CONFIG, Actor, isApify);
+    const extractedData = await runScraperOnly(CONFIG);
     
     // Handle data output based on environment
     await handleDataOutput(extractedData, CONFIG, Actor, isApify, CONFIG.COOKIES);
@@ -180,9 +174,6 @@ const crawlerOptions = {
             // Extract specialist data from detail page
             const specialistData = await extractSpecialistData(page, request.url, CONFIG);
             extractedData.push(specialistData);
-            
-            // Save immediately in Apify-style
-            await saveResultImmediately(specialistData, Actor, isApify, CONFIG);
             
         } else if (request.label === CONFIG.CRAWLER.labels.SPECIALISTS_LIST) {
             // We are on a specialists listing page (page 2, 3, etc.)

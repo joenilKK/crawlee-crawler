@@ -61,17 +61,29 @@ export async function handleDataOutput(data, config, Actor, isApify, originalCoo
     };
 
     if (isApify && Actor) {
-        // Store results in Apify dataset
-        await Actor.pushData({
-            summary,
-            specialists: data,
-            // Include original cookies if provided
-            cookies: originalCookies && originalCookies.length > 0 ? originalCookies : undefined
-        });
-        console.log(`📊 Data stored in Apify dataset`);
+        // Store results in Apify dataset - push each item individually (already done during crawl)
+        console.log(`📊 ${data.length} records stored in Apify dataset`);
     } else {
         // For local environment, just log the summary
         console.log('📊 Crawling Summary:', summary);
+    }
+}
+
+/**
+ * Save single result immediately (Apify-style)
+ * @param {Object} item - Single data item to save
+ * @param {Object} Actor - Apify Actor instance (null for local)
+ * @param {boolean} isApify - Whether running in Apify
+ * @param {Object} config - Configuration object (for local file saving)
+ */
+export async function saveResultImmediately(item, Actor, isApify, config = null) {
+    if (isApify && Actor) {
+        await Actor.pushData(item);
+        console.log(`💾 Saved result to Apify dataset`);
+    } else if (config) {
+        // For local mode, save as individual files
+        const { saveIndividualResult } = await import('../handlers/fileHandler.js');
+        await saveIndividualResult(item, config);
     }
 }
 
