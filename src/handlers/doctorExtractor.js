@@ -158,29 +158,17 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
                 }
             });
             
-            // Add categorized contact info as flat fields
-            if (phones.length === 1) {
-                flatDoctor.tel = phones[0];
-            } else {
-                phones.forEach((phone, index) => {
-                    flatDoctor[`tel_${index + 1}`] = phone;
-                });
+            // Add categorized contact info as flat fields (join multiple values with | separator)
+            if (phones.length > 0) {
+                flatDoctor.tel = phones.join(' | ');
             }
             
-            if (emails.length === 1) {
-                flatDoctor.email = emails[0];
-            } else {
-                emails.forEach((email, index) => {
-                    flatDoctor[`email_${index + 1}`] = email;
-                });
+            if (emails.length > 0) {
+                flatDoctor.email = emails.join(' | ');
             }
             
-            if (websites.length === 1) {
-                flatDoctor.website = websites[0];
-            } else {
-                websites.forEach((website, index) => {
-                    flatDoctor[`website_${index + 1}`] = website;
-                });
+            if (websites.length > 0) {
+                flatDoctor.website = websites.join(' | ');
             }
             
             allDoctors.push(flatDoctor);
@@ -318,29 +306,17 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
                 }
             });
             
-            // Add categorized contact info as flat fields
-            if (phones.length === 1) {
-                flatDoctor.tel = phones[0];
-            } else {
-                phones.forEach((phone, index) => {
-                    flatDoctor[`tel_${index + 1}`] = phone;
-                });
+            // Add categorized contact info as flat fields (join multiple values with | separator)
+            if (phones.length > 0) {
+                flatDoctor.tel = phones.join(' | ');
             }
             
-            if (emails.length === 1) {
-                flatDoctor.email = emails[0];
-            } else {
-                emails.forEach((email, index) => {
-                    flatDoctor[`email_${index + 1}`] = email;
-                });
+            if (emails.length > 0) {
+                flatDoctor.email = emails.join(' | ');
             }
             
-            if (websites.length === 1) {
-                flatDoctor.website = websites[0];
-            } else {
-                websites.forEach((website, index) => {
-                    flatDoctor[`website_${index + 1}`] = website;
-                });
+            if (websites.length > 0) {
+                flatDoctor.website = websites.join(' | ');
             }
             
             allDoctors.push(flatDoctor);

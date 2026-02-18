@@ -210,43 +210,26 @@ export async function extractSpecialistData(page, url, config) {
             }
         });
         
-        // Add categorized contact info as flat fields
-        if (phones.length === 1) {
-            specialistData.tel = phones[0];
-        } else {
-            phones.forEach((phone, index) => {
-                specialistData[`tel_${index + 1}`] = phone;
-            });
+        // Add categorized contact info as flat fields (join multiple values with | separator)
+        if (phones.length > 0) {
+            specialistData.tel = phones.join(' | ');
         }
         
-        if (emails.length === 1) {
-            specialistData.email = emails[0];
-        } else {
-            emails.forEach((email, index) => {
-                specialistData[`email_${index + 1}`] = email;
-            });
+        if (emails.length > 0) {
+            specialistData.email = emails.join(' | ');
         }
         
-        if (websites.length === 1) {
-            specialistData.website = websites[0];
-        } else {
-            websites.forEach((website, index) => {
-                specialistData[`website_${index + 1}`] = website;
-            });
+        if (websites.length > 0) {
+            specialistData.website = websites.join(' | ');
         }
         
-        if (addresses.length === 1) {
-            specialistData.address = addresses[0].text;
-            if (addresses[0].link) {
-                specialistData.address_link = addresses[0].link;
+        if (addresses.length > 0) {
+            specialistData.address = addresses.map(a => a.text).join(' | ');
+            // For links, only include if there's at least one non-empty link
+            const links = addresses.map(a => a.link).filter(link => link);
+            if (links.length > 0) {
+                specialistData.address_link = links.join(' | ');
             }
-        } else {
-            addresses.forEach((address, index) => {
-                specialistData[`address_${index + 1}`] = address.text;
-                if (address.link) {
-                    specialistData[`address_${index + 1}_link`] = address.link;
-                }
-            });
         }
         
         console.log(`Extracted data for: ${doctorName}`);
