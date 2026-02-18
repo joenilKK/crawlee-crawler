@@ -15,8 +15,8 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
     const allDoctors = [];
 
     try {
-        // First, try to find doctor cards/containers
-        const doctorCards = customSelectors.doctorCards || '.doctor-card, .doctor-item, .profile-card, .specialist-card, .card';
+        // Use provided doctor cards selector
+        const doctorCards = customSelectors.doctorCards;
         
         // Extract doctors data by iterating through each doctor card
         const doctors = await page.evaluate((selectors) => {
@@ -116,9 +116,9 @@ export async function extractDoctorData(page, url, customSelectors = {}) {
             
         }, {
             doctorCards: doctorCards,
-            doctorName: customSelectors.doctorName || '.doctor-name, .name, h3, h4, .title',
-            position: customSelectors.position || '.specialty, .position, .department, p, .description',
-            phoneLinks: customSelectors.phoneLinks || '.tel_number a, a[href^="tel:"], .phone a, .contact a'
+            doctorName: customSelectors.doctorName,
+            position: customSelectors.position,
+            phoneLinks: customSelectors.phoneLinks
         });
         
         console.log(`✅ Successfully extracted ${doctors.length} doctors from: ${url}`);
@@ -273,9 +273,9 @@ export async function extractDoctorDataFallback(page, url, customSelectors = {})
             return doctorsData;
             
         }, {
-            doctorName: customSelectors.doctorName || '.doctor-name, .name, h3, h4, .title',
-            position: customSelectors.position || '.specialty, .position, .department, p, .description',
-            phoneLinks: customSelectors.phoneLinks || '.tel_number a, a[href^="tel:"], .phone a, .contact a'
+            doctorName: customSelectors.doctorName,
+            position: customSelectors.position,
+            phoneLinks: customSelectors.phoneLinks
         });
         
         // Flatten each doctor into a separate result

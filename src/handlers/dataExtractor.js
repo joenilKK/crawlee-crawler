@@ -10,7 +10,7 @@
  */
 export async function extractDoctorName(page, config) {
     try {
-        await page.waitForSelector(config.SELECTORS.doctorName, { timeout: config.CRAWLER.timeout });
+        await page.waitForSelector(config.SELECTORS.doctorName, { timeout: 10000 });
         
         const doctorName = await page.evaluate((selector) => {
             const nameElement = document.querySelector(selector);
@@ -19,7 +19,7 @@ export async function extractDoctorName(page, config) {
         
         return doctorName;
     } catch (error) {
-        console.error('Error extracting doctor name:', error);
+        console.error('Error extracting doctor name:', error.message);
         return 'Name extraction failed';
     }
 }
@@ -33,7 +33,7 @@ export async function extractDoctorName(page, config) {
  */
 export async function extractSpecialty(page, config) {
     try {
-        await page.waitForSelector(config.SELECTORS.specialty, { timeout: config.CRAWLER.timeout });
+        await page.waitForSelector(config.SELECTORS.specialty, { timeout: 10000 });
         
         const specialties = await page.evaluate((selector) => {
             const specialtyElements = document.querySelectorAll(selector);
@@ -51,7 +51,7 @@ export async function extractSpecialty(page, config) {
         
         return specialties;
     } catch (error) {
-        console.error('Error extracting specialty:', error);
+        console.error('Error extracting specialty:', error.message);
         return ['Specialty extraction failed'];
     }
 }
